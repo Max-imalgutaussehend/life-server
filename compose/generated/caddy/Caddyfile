@@ -41,5 +41,20 @@
 	respond /healthz "ok" 200
 }
 
-# No services enabled yet. Entries appear here as milestones flip
-# `enabled: true` in services.yml.
+# ── whoami — Connectivity test target — echoes request headers
+#    access: public
+#    networks: apps
+whoami{$ENV_PREFIX}.{$DOMAIN} {
+	# Upstream is the container name, resolved by Docker's embedded DNS.
+	# {$ENV_PREFIX_NAME} yields e.g. "prod-" so the target is prod-whoami.
+	reverse_proxy {$ENV_PREFIX_NAME}whoami:8000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto https
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+

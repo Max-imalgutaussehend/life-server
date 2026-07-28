@@ -1,0 +1,129 @@
+# =============================================================================
+# docker-compose.prod.yml — the production stack.
+# =============================================================================
+#
+# WHY THIS FILE LOOKS THE WAY IT DOES
+#   - No `ports:` on anything web-facing. Traffic arrives through the
+#     Cloudflare tunnel, which dials OUT. Publishing a port would reopen the
+#     public attack surface the tunnel exists to remove. (ADR-0003)
+#   - Every named object carries ${ENV_PREFIX_NAME} so a dev stack can run
+#     alongside prod without colliding. (ADR-0010)
+#   - Image tags are pinned to an explicit minor version, never :latest.
+#     Pre-commit rejects :latest. (ADR-0011)
+#   - Services join only the networks they need. (ADR-0004)
+#
+# USAGE (on the server, as deploy)
+#   cd /opt/life-server && docker compose up -d
+#   Locally: make status / make logs / make health
+# =============================================================================
+
+name: ${ENV_PREFIX_NAME:-prod-}life-server
+
+# ── Networks (ADR-0004) ─────────────────────────────────────────────────────
+# edge  : tunnel <-> proxy only
+# apps  : proxy <-> applications
+# data  : applications <-> databases. `internal: true` means NO route to the
+#         internet at all — a database container cannot phone home.
+networks:
+  edge:
+    name: ${ENV_PREFIX_NAME:-prod-}net-edge
+  apps:
+    name: ${ENV_PREFIX_NAME:-prod-}net-apps
+  data:
+    name: ${ENV_PREFIX_NAME:-prod-}net-data
+    internal: true
+
+services:
+
+  # ── Cloudflare Tunnel ─────────────────────────────────────────────────────
+  # Outbound-only. Holds a persistent connection to Cloudflare's edge and
+  # forwards inbound requests to Caddy. Never listens on a host port.
+  # NOTE ON TOKEN MODE (dashboard-managed):
+  #   A token-run tunnel takes its ingress rules from the Cloudflare dashboard
+  #   and IGNORES any local config.yml. That splits the source of truth, which
+  #   ADR-0014 exists to prevent — so the dashboard is kept deliberately empty
+  #   with a single wildcard rule pointing at Caddy, and Caddy (driven by
+  #   services.yml) does all real routing. One dashboard rule, set once, never
+  #   touched again as services are added.
+  #
+  #   Migrating to a locally-managed tunnel (credentials file + config.yml) is
+  #   the cleaner end state and is tracked for M7, when SOPS makes storing the
+  #   credentials file safe.
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    container_name: ${ENV_PREFIX_NAME:-prod-}cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is not set in .env}
+      TUNNEL_METRICS: 0.0.0.0:2000
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "cloudflared", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      caddy:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Caddy ─────────────────────────────────────────────────────────────────
+  # Reverse proxy. Deliberately NOT the TLS terminator (Cloudflare is), and
+  # deliberately not publishing 80/443. Kept because it owns routing and is
+  # the seam that makes future Tailscale/LAN ingress a config change rather
+  # than a rebuild.
+  caddy:
+    image: caddy:2.10.2-alpine
+    container_name: ${ENV_PREFIX_NAME:-prod-}caddy
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is not set in .env}
+      ENV_PREFIX: ${ENV_PREFIX-}
+      ENV_PREFIX_NAME: ${ENV_PREFIX_NAME:-prod-}
+    volumes:
+      # Generated from services.yml — never edit directly. (ADR-0014)
+      - ./generated/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      edge:
+        # The dashboard tunnel rule targets `caddy:80`. This alias makes that
+        # name resolve to prod-caddy (or dev-caddy) without the rule needing
+        # to know the ${ENV} prefix.
+        aliases:
+          - caddy
+      apps: {}
+    healthcheck:
+      # /healthz is served by the generated Caddyfile.
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  # ── whoami — the vertical slice test target ───────────────────────────────
+  # Minimal HTTP server that echoes request details. Proves the whole path
+  # works: Cloudflare -> tunnel -> Caddy -> container. Removed once a real
+  # service occupies the slot.
+  whoami:
+    image: traefik/whoami:v1.11
+    container_name: ${ENV_PREFIX_NAME:-prod-}whoami
+    restart: unless-stopped
+    command: --port=8000
+    networks:
+      - apps
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+
+volumes:
+  caddy_data:
+    name: ${ENV_PREFIX_NAME:-prod-}caddy-data
+  caddy_config:
+    name: ${ENV_PREFIX_NAME:-prod-}caddy-config

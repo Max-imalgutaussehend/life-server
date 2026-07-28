@@ -12,8 +12,9 @@ add or change a service there and run `make generate`.
 
 ## Deployed
 
-_None yet._ Every service below is declared but not deployed. Each milestone
-flips its `enabled` flag when it actually ships.
+| Service | Hostname (prod) | Hostname (dev) | Port | Access | Networks | Health |
+|---|---|---|---|---|---|---|
+| `whoami` | `whoami.$DOMAIN` | `whoami.dev.$DOMAIN` | 8000 | public | apps | `/` |
 
 ## Declared, not yet deployed
 

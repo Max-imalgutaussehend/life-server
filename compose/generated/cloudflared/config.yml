@@ -32,7 +32,10 @@ originRequest:
   noTLSVerify: false
 
 ingress:
-  # No services enabled yet — see services.yml.
+  # whoami — Connectivity test target — echoes request headers [access: public]
+  - hostname: "whoami${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
   # Catch-all. Required by cloudflared: the last rule must have no hostname.
   # Anything not matched above is refused rather than silently routed.
   - service: http_status:404

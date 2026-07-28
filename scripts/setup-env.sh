@@ -62,7 +62,9 @@ if $CHECK_ONLY; then
 		exit 1
 	fi
 	missing=$(comm -23 <(declared_keys | sort) <(existing_keys | sort) || true)
-	extra=$(comm -13 <(declared_keys | sort) <(existing_keys | sort) || true)
+	# ENV_PREFIX/ENV_PREFIX_NAME are derived, not declared — exclude them.
+	extra=$(comm -13 <(declared_keys | sort) <(existing_keys | sort) \
+		| grep -vE '^(ENV_PREFIX|ENV_PREFIX_NAME)$' || true)
 	unset_vals=$(grep -E '^[A-Z][A-Z0-9_]*=(__GENERATE__|__SET_MANUALLY__)$' "$ENV_FILE" | cut -d= -f1 || true)
 
 	rc=0
@@ -133,6 +135,30 @@ fi
 # .env must never be world- or group-readable: database passwords and the
 # n8n encryption key live here.
 chmod 600 "$ENV_FILE"
+
+# ── Derived prefixes (ADR-0010) ─────────────────────────────────────────────
+# ENV_PREFIX and ENV_PREFIX_NAME are DERIVED from ENV, never set by hand.
+# Keeping them out of env.example avoids two sources of truth: change ENV and
+# both follow automatically.
+#   ENV=prod -> ENV_PREFIX=""      ENV_PREFIX_NAME="prod-"
+#   ENV=dev  -> ENV_PREFIX=".dev"  ENV_PREFIX_NAME="dev-"
+current_env=$(grep -E '^ENV=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+case "$current_env" in
+	prod) derived_prefix=""     ; derived_name="prod-" ;;
+	dev)  derived_prefix=".dev" ; derived_name="dev-"  ;;
+	*)    echo "error: ENV must be 'prod' or 'dev', found '${current_env}'" >&2; exit 2 ;;
+esac
+
+# Rewrite both lines every run so they can never drift from ENV.
+grep -vE '^(ENV_PREFIX|ENV_PREFIX_NAME)=' "$ENV_FILE" > "$ENV_FILE.tmp"
+{
+	printf '\n# Derived from ENV by setup-env.sh — do not edit by hand.\n'
+	printf 'ENV_PREFIX=%s\n' "$derived_prefix"
+	printf 'ENV_PREFIX_NAME=%s\n' "$derived_name"
+} >> "$ENV_FILE.tmp"
+mv "$ENV_FILE.tmp" "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+echo "derived ENV_PREFIX_NAME=${derived_name} from ENV=${current_env}"
 
 manual=$(grep -E '^[A-Z][A-Z0-9_]*=__SET_MANUALLY__$' "$ENV_FILE" | cut -d= -f1 || true)
 if [[ -n "$manual" ]]; then

@@ -54,6 +54,16 @@
 # ============================================================================
 
 services:
+  # Vertical-slice test target (M3). Echoes request details, proving the full
+  # path works: Cloudflare -> tunnel -> Caddy -> container. Remove once a real
+  # service has taken its place.
+  - name: whoami
+    port: 8000
+    description: "Connectivity test target — echoes request headers"
+    networks: [apps]
+    access: public # deliberately public: it must be reachable to prove the path
+    enabled: true
+
   - name: n8n
     port: 5678
     description: "Workflow automation and integration engine"

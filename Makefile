@@ -143,6 +143,14 @@ health: ## [M2] Health status of every running container
 		| awk -F"\t" "{printf \"  %-24s %s\\n\", \$$1, \$$2}" \
 		|| echo "docker not installed yet (M2)"'
 
+.PHONY: deploy-stack
+deploy-stack: ## [M2] Sync repo to server and start the stack
+	@./scripts/deploy.sh
+
+.PHONY: sync
+sync: ## [M2] Sync repo to server without restarting anything
+	@./scripts/deploy.sh --sync-only
+
 .PHONY: deploy
 deploy: ## [M7] Pull latest images and restart
 	@echo "$(ERR)not built yet — M7$(OFF)"; exit 1
