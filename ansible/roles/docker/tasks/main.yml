@@ -1,9 +1,105 @@
 ---
-# Role: docker — see ansible/roles/docker/README.md
-# Implemented in M1. Intentionally empty so `make harden-check` runs
-# cleanly and the structure is reviewable before any change is applied.
-- name: Placeholder (docker role is implemented in M1)
-  ansible.builtin.debug:
-    msg: "role 'docker' not yet implemented"
-  changed_when: false
-  tags: [placeholder]
+# docker — install the container platform. Does NOT manage containers;
+# that is Docker Compose's job, driven by services.yml (ADR-0001, ADR-0002).
+
+- name: Create apt keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Add Docker GPG key
+  # Docker's own repository, not Ubuntu's docker.io package: the distro
+  # version lags and pins Compose to an old release.
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Add Docker apt repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: "https://download.docker.com/linux/ubuntu"
+    suites: ["{{ ansible_distribution_release }}"]
+    components: [stable]
+    architectures: ["{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"]
+    signed_by: /etc/apt/keyrings/docker.asc
+    state: present
+    enabled: true
+
+- name: Install Docker Engine and Compose plugin
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Configure Docker daemon
+  # NOTE: daemon.json carries NO comments. Docker rejects unknown directives
+  # outright — a "//" comment key makes dockerd refuse to start. (Found the
+  # hard way in M1: `validate` only checked JSON syntax, not Docker's schema.)
+  # Rationale for each setting:
+  #   log-driver/log-opts   cap container logs so they cannot fill the disk.
+  #                         The agent audit trail is separate (ADR-0012).
+  #   live-restore          containers survive a daemon restart, so upgrading
+  #                         Docker is not an outage.
+  #   userland-proxy false  use iptables instead of a per-port proxy process;
+  #                         irrelevant anyway since no ports are published.
+  #   default-address-pools pin subnets so Docker cannot pick a range that
+  #                         collides with Hetzner private networking or a VPN.
+  ansible.builtin.template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "python3 -c \"import json,sys; json.load(open('%s'))\""
+  notify: Restart docker
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Add deploy user to docker group
+  # NOTE: membership in the docker group is equivalent to root — a member can
+  # start a container that mounts the host filesystem. This is accepted because
+  # deploy already has passwordless sudo, so it grants nothing new. It is NOT
+  # a safe grant for a user who should be unprivileged.
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: true
+
+- name: Create life-server directory tree
+  ansible.builtin.file:
+    path: "/opt/life-server/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0750"
+  loop:
+    - ""
+    - data
+    - data/audit      # append-only agent audit log (ADR-0012), used from M9
+    - backups
+    - configs
+    - scripts
+
+- name: Install lazydocker
+  # The Portainer replacement (ADR-0008): a terminal UI, no running service,
+  # no web session to hijack.
+  ansible.builtin.unarchive:
+    src: >-
+      https://github.com/jesseduffield/lazydocker/releases/download/v0.24.1/lazydocker_0.24.1_Linux_x86_64.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    include: [lazydocker]
+    mode: "0755"
+    creates: /usr/local/bin/lazydocker

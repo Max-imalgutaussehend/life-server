@@ -1,0 +1,46 @@
+---
+# verify_access — the lockout rehearsal.
+#
+# This is the single most important role in M1. It proves, with a real
+# connection, that the deploy user can log in AND escalate BEFORE the
+# security role removes root access.
+#
+# If any task here fails, the play aborts and root login is still enabled.
+# That is the point: a broken deploy account must never coincide with a
+# disabled root account.
+
+# The whole role is skipped in check mode — there is no real deploy user to
+# connect as. This means `make harden-check` does NOT exercise the lockout
+# rehearsal; only the real `make harden` does. That is unavoidable, and it is
+# why the rehearsal aborts the play on failure rather than merely warning.
+
+- name: Verify deploy user can authenticate and run sudo
+  # A genuine SSH connection as deploy, from the control machine, using the
+  # same key you would use. Not a simulation.
+  ansible.builtin.command:
+    cmd: >-
+      ssh -i {{ deploy_pubkey_path | expanduser | regex_replace('\.pub$', '') }}
+      -o BatchMode=yes
+      -o StrictHostKeyChecking=accept-new
+      -o ConnectTimeout=10
+      {{ deploy_user }}@{{ ansible_host }}
+      'sudo -n id -u'
+  delegate_to: localhost
+  become: false
+  changed_when: false
+  register: deploy_login
+  when: not ansible_check_mode
+
+- name: Assert the deploy user reached uid 0 via sudo
+  when: not ansible_check_mode
+  ansible.builtin.assert:
+    that:
+      - deploy_login.rc == 0
+      - deploy_login.stdout | trim == "0"
+    success_msg: >-
+      Lockout rehearsal passed: {{ deploy_user }} authenticated with its key
+      and escalated to root. Safe to disable root SSH.
+    fail_msg: >-
+      LOCKOUT REHEARSAL FAILED. {{ deploy_user }} could not log in or could not
+      sudo. Root SSH has NOT been disabled. Fix the deploy account before
+      re-running. Your existing root session is still valid.

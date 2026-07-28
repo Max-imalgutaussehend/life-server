@@ -1,0 +1,29 @@
+---
+# Variables shared by every role. Change here, not in the roles.
+
+# The non-root user that owns /opt/life-server and runs docker compose.
+deploy_user: deploy
+
+# Public key installed for deploy_user. Read from the operator's machine at
+# runtime so the key is never committed to Git.
+deploy_pubkey_path: "~/.ssh/life-server.pub"
+
+server_hostname: life-server
+server_timezone: Europe/Berlin
+
+# 3.7 GB RAM. Swap is a safety margin against the OOM killer, not a
+# performance feature — swappiness is lowered so it is only used under
+# real pressure. See docs/milestones/M1.md.
+swap_size_mb: 2048
+swappiness: 10
+
+# SSH stays open until Tailscale is proven in M8.5 (ADR-0013).
+ssh_port: 22
+
+# fail2ban: 5 failures in 10 min -> 1 h ban.
+fail2ban_maxretry: 5
+fail2ban_findtime: 10m
+fail2ban_bantime: 1h
+
+# Unattended upgrades reboot at this time if a reboot is required.
+unattended_reboot_time: "04:00"

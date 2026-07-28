@@ -1,0 +1,38 @@
+# {{ ansible_managed }}
+# Managed by ansible/roles/security. Edit the role, not this file.
+#
+# Ubuntu 24.04 reads /etc/ssh/sshd_config.d/*.conf. Using a drop-in rather
+# than editing sshd_config keeps the distribution file pristine and makes
+# rollback a single file deletion.
+
+# Key authentication only. This is the change that matters most: it makes
+# password brute-forcing impossible rather than merely slow.
+PasswordAuthentication no
+PubkeyAuthentication yes
+PermitEmptyPasswords no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+
+# No direct root login. Administration goes through {{ deploy_user }} + sudo,
+# which means every privileged action is attributable in the auth log.
+PermitRootLogin no
+
+# Only the deploy user may log in at all.
+AllowUsers {{ deploy_user }}
+
+Port {{ ssh_port }}
+
+# Reduce the window for unauthenticated connections to sit open.
+LoginGraceTime 30
+MaxAuthTries 3
+MaxSessions 10
+
+# Not needed for a headless server; each is an attack surface.
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding yes
+PermitTunnel no
+
+# Drop idle sessions after 10 minutes of unresponsiveness.
+ClientAliveInterval 300
+ClientAliveCountMax 2

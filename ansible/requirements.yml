@@ -1,0 +1,12 @@
+---
+# Ansible collections required by the roles.
+# Install: ansible-galaxy collection install -r ansible/requirements.yml
+#
+# Only two, both official and stable. Kept minimal on purpose (ADR-0001):
+# external dependencies whose upgrade cadence we do not control are exactly
+# what makes an infrastructure repo rot.
+collections:
+  - name: community.general   # timezone, ufw modules
+    version: ">=10.0.0"
+  - name: ansible.posix       # sysctl, authorized_key modules
+    version: ">=1.6.0"

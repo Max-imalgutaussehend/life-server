@@ -1,9 +1,134 @@
 ---
-# Role: security — see ansible/roles/security/README.md
-# Implemented in M1. Intentionally empty so `make harden-check` runs
-# cleanly and the structure is reviewable before any change is applied.
-- name: Placeholder (security role is implemented in M1)
-  ansible.builtin.debug:
-    msg: "role 'security' not yet implemented"
-  changed_when: false
-  tags: [placeholder]
+# security — SSH hardening, firewall, fail2ban, automatic updates.
+#
+# Runs ONLY after verify_access has proven the deploy user works.
+# Ordering inside this role also matters: UFW is configured and enabled
+# BEFORE sshd is restarted, so there is never a window with a new sshd
+# config and no firewall.
+
+# ── Firewall ────────────────────────────────────────────────────────────────
+
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Default deny incoming
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Default allow outgoing
+  # Containers need to reach the internet (image pulls, API calls, the
+  # Cloudflare tunnel dialling out). Egress filtering would break the tunnel
+  # model for no gain on a single-tenant host.
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Rate-limit SSH
+  # `limit` not `allow`: ufw drops connections from an IP exceeding ~6
+  # attempts in 30s. Cheap defence against credential stuffing, on top of
+  # key-only auth. Port closes entirely in M8.5 (ADR-0013).
+  community.general.ufw:
+    rule: limit
+    port: "{{ ssh_port }}"
+    proto: tcp
+    comment: "SSH (rate limited) - closes at M8.5"
+
+- name: Enable ufw with logging
+  community.general.ufw:
+    state: enabled
+    logging: low
+
+# ── fail2ban ────────────────────────────────────────────────────────────────
+
+- name: Install fail2ban
+  ansible.builtin.apt:
+    name: fail2ban
+    state: present
+
+- name: Configure fail2ban sshd jail
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Enable and start fail2ban
+  # Skipped in check mode: the unit file only exists once the package is
+  # really installed.
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+    state: started
+  when: not ansible_check_mode
+
+# ── Automatic security updates ──────────────────────────────────────────────
+
+- name: Configure unattended-upgrades
+  ansible.builtin.template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable periodic apt tasks
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+    owner: root
+    group: root
+    mode: "0644"
+
+# ── SSH hardening — LAST, after verify_access proved deploy works ──────────
+
+- name: Remove cloud-init SSH drop-in
+  # Ubuntu's cloud-init writes /etc/ssh/sshd_config.d/50-cloud-init.conf
+  # containing `PasswordAuthentication yes`. sshd uses FIRST-match-wins for
+  # directives, and 50- sorts before 99-, so that file silently overrides our
+  # hardening. This was caught in M1 by checking `sshd -T` rather than
+  # trusting that writing the file was enough.
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/50-cloud-init.conf
+    state: absent
+  notify: Restart sshd
+
+- name: Prevent cloud-init from recreating the SSH drop-in
+  # Without this, a cloud-init re-run on reboot restores the file and
+  # re-enables password auth.
+  ansible.builtin.copy:
+    dest: /etc/cloud/cloud.cfg.d/99-disable-ssh-pwauth.cfg
+    content: |
+      # Managed by ansible/roles/security.
+      # Stops cloud-init rewriting sshd_config.d/50-cloud-init.conf.
+      ssh_pwauth: false
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Harden sshd
+  ansible.builtin.template:
+    src: sshd_hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-life-server.conf
+    owner: root
+    group: root
+    mode: "0644"
+    # A malformed sshd config would leave the daemon unable to restart.
+    # -t validates before the file is installed.
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+  # In check mode the drop-in is not written, so `sshd -T` in post_tasks would
+  # report the OLD config and the assertion would fail misleadingly.
+  when: not ansible_check_mode
+
+- name: Flush handlers so sshd restarts before the play ends
+  # Without this the restart happens at the very end; we want it here so the
+  # post_tasks verification in site.yml tests the NEW config.
+  ansible.builtin.meta: flush_handlers

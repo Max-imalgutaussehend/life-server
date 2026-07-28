@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+# fail2ban jail configuration. Edit ansible/roles/security, not this file.
+#
+# With password auth disabled, fail2ban's role is narrower than usual: it
+# mainly cuts log noise and stops repeated key-probing. Kept because it costs
+# nothing and covers future services that do accept passwords.
+
+[DEFAULT]
+bantime  = {{ fail2ban_bantime }}
+findtime = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+backend  = systemd
+# Never ban loopback or Docker's default bridge range.
+ignoreip = 127.0.0.1/8 ::1 172.16.0.0/12
+
+[sshd]
+enabled  = true
+port     = {{ ssh_port }}
+mode     = aggressive

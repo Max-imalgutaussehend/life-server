@@ -1,9 +1,60 @@
 ---
-# Role: users — see ansible/roles/users/README.md
-# Implemented in M1. Intentionally empty so `make harden-check` runs
-# cleanly and the structure is reviewable before any change is applied.
-- name: Placeholder (users role is implemented in M1)
-  ansible.builtin.debug:
-    msg: "role 'users' not yet implemented"
-  changed_when: false
-  tags: [placeholder]
+# users — create the deploy user before anything disables root.
+# This role MUST run before `security`, or the playbook removes root access
+# with no replacement in place.
+
+- name: Read the operator public key from the control machine
+  # delegate_to: localhost -> read the key from YOUR mac, not the server.
+  # This keeps the key out of Git while still automating its installation.
+  ansible.builtin.slurp:
+    src: "{{ deploy_pubkey_path | expanduser }}"
+  register: deploy_pubkey_raw
+  delegate_to: localhost
+  become: false
+
+- name: Create deploy group
+  ansible.builtin.group:
+    name: "{{ deploy_user }}"
+    state: present
+
+- name: Create deploy user
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    shell: /bin/bash
+    create_home: true
+    # No password is set. The account is key-only; there is no password to
+    # brute force and none to leak.
+    password: "!"
+    state: present
+
+- name: Install authorized key for deploy
+  # Skipped in check mode: the module needs the user's home directory to
+  # exist, and in a dry run the user was only simulated. The real run creates
+  # the user first, so this is a check-mode artifact, not a gap in coverage.
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ deploy_pubkey_raw.content | b64decode }}"
+    state: present
+    exclusive: true    # remove any key not listed here
+  when: not ansible_check_mode
+
+- name: Grant passwordless sudo to deploy
+  # Passwordless because the account has no password to type. Security comes
+  # from the SSH key, not from a second secret that would have to be stored
+  # somewhere to automate against.
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ deploy_user }}"
+    content: "{{ deploy_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"   # never install a sudoers file that breaks sudo
+
+- name: Create /opt/life-server owned by deploy
+  ansible.builtin.file:
+    path: /opt/life-server
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0750"

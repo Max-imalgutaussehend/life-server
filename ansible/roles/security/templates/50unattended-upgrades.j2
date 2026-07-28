@@ -1,0 +1,28 @@
+// {{ ansible_managed }}
+// Automatic security updates. Edit ansible/roles/security, not this file.
+
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}";
+    "${distro_id}:${distro_codename}-security";
+    "${distro_id}ESMApps:${distro_codename}-apps-security";
+    "${distro_id}ESM:${distro_codename}-infra-security";
+};
+
+// Security updates only. Feature updates are a deliberate act, not something
+// that happens overnight to a server running your automation.
+Unattended-Upgrade::Package-Blacklist {
+};
+
+Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+Unattended-Upgrade::MinimalSteps "true";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+
+// Reboot automatically when a kernel update requires it. 04:00 local time.
+// A container host that never reboots accumulates unpatched kernels; the
+// containers come back up on their own via restart policies.
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+Unattended-Upgrade::Automatic-Reboot-Time "{{ unattended_reboot_time }}";
+
+Unattended-Upgrade::SyslogEnable "true";

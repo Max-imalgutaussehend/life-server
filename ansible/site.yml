@@ -4,14 +4,20 @@
 # =============================================================================
 #
 # SCOPE: users, SSH, firewall, base packages, Docker. Nothing else.
-# Applications are Docker Compose's job (ADR-0002). Resist adding roles here.
+# Applications are Docker Compose's job (ADR-0002).
 #
 # USAGE
-#   make harden-check   # dry run, changes nothing
+#   make harden-check   # dry run with diff, changes nothing
 #   make harden         # apply
 #
-# Roles run in this order deliberately: a user must exist before SSH config
-# can forbid root login, or the playbook locks itself out.
+# ROLE ORDER IS A SAFETY PROPERTY, NOT A PREFERENCE:
+#   common        -> base system
+#   users         -> create deploy BEFORE anything removes root
+#   verify_access -> PROVE deploy can log in and sudo, or abort
+#   security      -> only now disable root login and password auth
+#   docker        -> platform
+#
+# If verify_access fails the play stops with root access still enabled.
 # =============================================================================
 
 - name: Host baseline
@@ -19,8 +25,7 @@
   become: true
 
   pre_tasks:
-    - name: Verify this is Ubuntu 24.04
-      # Fail early rather than half-applying a playbook written for noble.
+    - name: Verify this is Ubuntu 24.04 or newer
       ansible.builtin.assert:
         that:
           - ansible_distribution == "Ubuntu"
@@ -29,8 +34,51 @@
           Expected Ubuntu 24.04+, found
           {{ ansible_distribution }} {{ ansible_distribution_version }}.
 
+    - name: Verify the operator public key exists on the control machine
+      ansible.builtin.stat:
+        path: "{{ deploy_pubkey_path | expanduser }}"
+      register: pubkey_stat
+      delegate_to: localhost
+      become: false
+
+    - name: Fail early if the public key is missing
+      ansible.builtin.assert:
+        that: pubkey_stat.stat.exists
+        fail_msg: >-
+          {{ deploy_pubkey_path }} not found. The deploy user would be created
+          with no way to log in.
+
   roles:
-    - role: common     # hostname, timezone, packages, swap
-    - role: users      # deploy user + SSH keys      (must precede security)
-    - role: security   # sshd, ufw, fail2ban, unattended-upgrades
-    - role: docker     # Docker CE, compose plugin, log rotation
+    - role: common
+    - role: users
+    - role: verify_access   # lockout rehearsal — must pass before security
+    - role: security
+    - role: docker
+
+  post_tasks:
+    - name: Confirm sshd rejects passwords and root login
+      when: not ansible_check_mode
+      ansible.builtin.command:
+        cmd: sshd -T
+      register: sshd_effective
+      changed_when: false
+
+    - name: Assert hardening actually took effect
+      when: not ansible_check_mode
+      # sshd -T shows the EFFECTIVE config. Asserting on it catches a drop-in
+      # file that was written but overridden by something earlier in the config.
+      ansible.builtin.assert:
+        that:
+          - "'passwordauthentication no' in sshd_effective.stdout"
+          - "'permitrootlogin no' in sshd_effective.stdout"
+        success_msg: "sshd verified: password auth off, root login off."
+        fail_msg: >-
+          sshd config did not take effect. Check
+          /etc/ssh/sshd_config.d/99-life-server.conf against `sshd -T`.
+
+    - name: Report final state
+      ansible.builtin.debug:
+        msg:
+          - "Host baseline applied."
+          - "SSH: key-only, root login disabled, user={{ deploy_user }}"
+          - "Next: ssh -i ~/.ssh/life-server {{ deploy_user }}@{{ ansible_host }}"

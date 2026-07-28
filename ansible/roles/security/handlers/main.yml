@@ -1,0 +1,16 @@
+---
+# Handlers are guarded against check mode: the services they restart are only
+# simulated in a dry run, so an unguarded restart fails on a unit that does
+# not exist yet.
+
+- name: Restart sshd
+  ansible.builtin.systemd:
+    name: ssh
+    state: restarted
+  when: not ansible_check_mode
+
+- name: Restart fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: restarted
+  when: not ansible_check_mode
