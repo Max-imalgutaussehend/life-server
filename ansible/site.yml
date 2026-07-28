@@ -1,0 +1,36 @@
+---
+# =============================================================================
+# site.yml — the host baseline. (ADR-0001)
+# =============================================================================
+#
+# SCOPE: users, SSH, firewall, base packages, Docker. Nothing else.
+# Applications are Docker Compose's job (ADR-0002). Resist adding roles here.
+#
+# USAGE
+#   make harden-check   # dry run, changes nothing
+#   make harden         # apply
+#
+# Roles run in this order deliberately: a user must exist before SSH config
+# can forbid root login, or the playbook locks itself out.
+# =============================================================================
+
+- name: Host baseline
+  hosts: life
+  become: true
+
+  pre_tasks:
+    - name: Verify this is Ubuntu 24.04
+      # Fail early rather than half-applying a playbook written for noble.
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version is version('24.04', '>=')
+        fail_msg: >-
+          Expected Ubuntu 24.04+, found
+          {{ ansible_distribution }} {{ ansible_distribution_version }}.
+
+  roles:
+    - role: common     # hostname, timezone, packages, swap
+    - role: users      # deploy user + SSH keys      (must precede security)
+    - role: security   # sshd, ufw, fail2ban, unattended-upgrades
+    - role: docker     # Docker CE, compose plugin, log rotation

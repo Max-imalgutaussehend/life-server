@@ -1,0 +1,66 @@
+# =============================================================================
+# pre-commit — checks that run before every commit.
+# =============================================================================
+#
+# WHY
+#   The two failures this repo cannot tolerate are (a) a secret reaching Git
+#   and (b) generated files drifting from services.yml. Both are caught here,
+#   locally, before they become permanent history.
+#
+# INSTALL (once)
+#   brew install pre-commit && pre-commit install
+#
+# BYPASS (emergencies only, and think first)
+#   git commit --no-verify
+# =============================================================================
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      # Catches a .env committed by mistake even if .gitignore is edited.
+      - id: detect-private-key
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      # Scans staged content for credentials. The last line of defence for
+      # ADR-0006's "secrets never reach Git".
+      - id: gitleaks
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+  - repo: local
+    hooks:
+      # Generated files must match services.yml (ADR-0014). Without this,
+      # a registry edit could be committed while Caddy still routes the old way.
+      - id: generated-files-current
+        name: generated files match services.yml
+        entry: python3 generator/render.py --check
+        language: system
+        pass_filenames: false
+        files: '^(services\.yml|generator/)'
+
+      # ADR-0011: pinned versions only.
+      - id: no-latest-tag
+        name: no :latest image tags
+        entry: bash -c 'if grep -rn "image:.*:latest" compose/ 2>/dev/null; then echo "ERROR: :latest violates ADR-0011 (pin an explicit version)"; exit 1; fi'
+        language: system
+        pass_filenames: false
+
+      # Belt and braces: .env must never be staged.
+      - id: no-env-file
+        name: .env must not be committed
+        entry: bash -c 'if git diff --cached --name-only | grep -qE "^\.env$"; then echo "ERROR: .env is staged. It holds secrets (ADR-0006)."; exit 1; fi'
+        language: system
+        pass_filenames: false

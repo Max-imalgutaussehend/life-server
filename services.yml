@@ -1,0 +1,91 @@
+# ============================================================================
+# services.yml — THE single source of truth for externally reachable services.
+# ============================================================================
+#
+# WHY THIS FILE EXISTS
+#   Adding a service to a normal Docker host means editing the Caddyfile, the
+#   Cloudflare tunnel config, the compose file, the env file, the monitoring
+#   config and the docs — six places, six chances to forget one. That drift is
+#   the reason "production" servers slowly stop matching their documentation.
+#
+#   This file is the only place a service is declared. Everything else is
+#   generated from it by `make generate` (see generator/render.py).
+#
+# HOSTNAME DERIVATION — never hardcode a hostname anywhere.
+#   prod:  <name>.<DOMAIN>              -> n8n.maxrommel.de
+#   dev:   <name>.dev.<DOMAIN>          -> n8n.dev.maxrommel.de
+#   DOMAIN and ENV come from .env. The generator applies the rule; no file
+#   downstream ever contains a literal hostname.
+#
+# WHAT IS GENERATED FROM THIS FILE
+#   compose/generated/caddy/Caddyfile        reverse-proxy routes
+#   compose/generated/cloudflared/config.yml tunnel ingress rules
+#   compose/generated/services.env           per-service hostname variables
+#   docs/generated/SERVICES.md               service inventory table
+#   (later milestones: uptime-kuma monitors, compose service fragments)
+#
+# HOW TO ADD A SERVICE
+#   1. Add an entry below.
+#   2. Run `make generate`.
+#   3. Commit both this file and the regenerated output.
+#   Nothing else. If you find yourself editing generated files by hand, the
+#   generator is missing a feature — fix the generator, not the output.
+#
+# FIELD REFERENCE
+#   name          required. DNS label + compose service name. [a-z0-9-]
+#   port          required. Port the container listens on *inside* Docker.
+#                 This is never published to the host (ADR-0003).
+#   description   required. One line. Shown in generated docs.
+#   networks      required. Which segmented networks the service joins.
+#                 Valid: edge, apps, data  (ADR-0004)
+#   access        required. Cloudflare Access policy (ADR-0003).
+#                 "private"  -> Access-protected, only you can reach it
+#                 "public"   -> reachable without Access. Use sparingly and
+#                               only for things genuinely meant for the world.
+#   envs          optional. Which environments it runs in. Default [prod, dev].
+#   healthcheck   optional. HTTP path for liveness. Default "/".
+#   enabled       optional. Default true. false = declared but not deployed;
+#                 keeps the entry documented without generating routes.
+#
+# NOTE ON THE CURRENT STATE
+#   Every service below is enabled:false because none are deployed yet (M0).
+#   Each will be flipped to true in the milestone that actually deploys it.
+#   They are listed now so the registry documents the target architecture.
+# ============================================================================
+
+services:
+  - name: n8n
+    port: 5678
+    description: "Workflow automation and integration engine"
+    networks: [apps, data]
+    access: private
+    healthcheck: /healthz
+    enabled: false # -> true in M6
+
+  - name: paperclip
+    port: 8080
+    description: "Paperclip application"
+    networks: [apps, data]
+    access: private
+    enabled: false # -> true in M9
+
+  - name: hermes
+    port: 8081
+    description: "Hermes agent manager"
+    networks: [apps, data]
+    access: private
+    enabled: false # -> true in M9
+
+  - name: status
+    port: 3001
+    description: "Uptime Kuma — service monitoring and alerting"
+    networks: [apps]
+    access: private
+    enabled: false # -> true in M8
+
+  - name: ntfy
+    port: 80
+    description: "Push notification relay for alerts"
+    networks: [apps]
+    access: private
+    enabled: false # -> true in M8

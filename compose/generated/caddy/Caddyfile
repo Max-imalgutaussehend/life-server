@@ -1,0 +1,45 @@
+# =============================================================================
+# GENERATED FILE — DO NOT EDIT
+# Source:    services.yml
+# Generator: generator/render.py
+# Regenerate: make generate
+#
+# Hand edits are silently overwritten and will fail `make check` in pre-commit.
+# To change routing, edit services.yml instead.
+# =============================================================================
+#
+# WHY CADDY BINDS ONLY :80 AND ONLY INSIDE DOCKER (ADR-0003)
+#   Cloudflare terminates TLS at the edge and reaches this container through
+#   the tunnel, which is itself encrypted. Caddy therefore needs no
+#   certificates and no host port. The compose service publishes NO ports, so
+#   UFW needs no rule for 80/443 and the origin has zero public listeners.
+#
+#   `auto_https off` is required: without it Caddy would try to obtain
+#   certificates for every site address and fail, because nothing can reach
+#   it on :443 from outside.
+#
+# HOSTNAMES ARE NOT HARDCODED
+#   {$DOMAIN} and {$ENV_PREFIX} are resolved by Caddy at startup from the
+#   environment (fed by .env). One generated file is therefore correct for
+#   both prod and dev — no re-render on environment switch (ADR-0010).
+#     prod: ENV_PREFIX=""      -> n8n.maxrommel.de
+#     dev:  ENV_PREFIX=".dev"  -> n8n.dev.maxrommel.de
+
+{
+	auto_https off
+	admin off
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+# Health endpoint for the container's own healthcheck and for Uptime Kuma.
+# Bound to :80 on the internal network only.
+:80 {
+	respond /healthz "ok" 200
+}
+
+# No services enabled yet. Entries appear here as milestones flip
+# `enabled: true` in services.yml.

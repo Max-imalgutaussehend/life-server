@@ -1,0 +1,48 @@
+{# Template -> compose/generated/cloudflared/config.yml  (ADR-0003, ADR-0014) #}
+# =============================================================================
+# GENERATED FILE — DO NOT EDIT
+# Source:    {{ registry }}
+# Generator: {{ generator }}
+# Regenerate: make generate
+# =============================================================================
+#
+# WHAT THIS DOES
+#   cloudflared dials OUT to Cloudflare and holds the connection open. Traffic
+#   arrives through that tunnel — the server never accepts an inbound
+#   connection on 80/443, and UFW blocks those ports entirely (ADR-0003).
+#
+# WHY EVERY RULE POINTS AT CADDY
+#   The tunnel could address containers directly, but then routing logic would
+#   live in two places. Instead every hostname lands on Caddy, which owns
+#   routing. Cloudflare handles TLS and Access; Caddy handles paths, headers
+#   and anything Cloudflare cannot express.
+#
+# ACCESS POLICIES ARE NOT DEFINED HERE
+#   Cloudflare Access rules live in the Zero Trust dashboard, not in this file
+#   (the tunnel config cannot express them). The `access:` field in
+#   {{ registry }} is the source of truth for what SHOULD be protected;
+#   docs/generated/SERVICES.md lists it so the dashboard can be audited
+#   against it. Verifying that match is a manual step in M3.
+
+tunnel: ${CLOUDFLARE_TUNNEL_ID}
+credentials-file: /etc/cloudflared/creds.json
+
+# Fail fast rather than serving a confusing error if Caddy is down.
+originRequest:
+  connectTimeout: 10s
+  noTLSVerify: false
+
+ingress:
+{% if enabled_services %}
+{% for svc in enabled_services %}
+  # {{ svc.name }} — {{ svc.description }} [access: {{ svc.access }}]
+  - hostname: "{{ svc.name }}${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
+{% endfor %}
+{% else %}
+  # No services enabled yet — see {{ registry }}.
+{% endif %}
+  # Catch-all. Required by cloudflared: the last rule must have no hostname.
+  # Anything not matched above is refused rather than silently routed.
+  - service: http_status:404

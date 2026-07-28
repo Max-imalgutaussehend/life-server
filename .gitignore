@@ -1,0 +1,26 @@
+# ── Secrets ─────────────────────────────────────────────────────────────
+# .env holds generated passwords (ADR-0006). NEVER commit it.
+# Until SOPS lands in M7, this file is the one part of the system that is
+# NOT reproducible from Git — it must be covered by backups (M5).
+.env
+.env.*
+!env.example
+*.key
+*.pem
+!**/*.pub
+
+# ── Ansible ─────────────────────────────────────────────────────────────
+*.retry
+ansible/inventory.local.ini
+.vault-pass
+
+# ── Python (generator) ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ── OS / editor ─────────────────────────────────────────────────────────
+.DS_Store
+*.swp
+.idea/

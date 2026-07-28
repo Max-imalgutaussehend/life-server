@@ -1,0 +1,9 @@
+---
+# Role: users — see ansible/roles/users/README.md
+# Implemented in M1. Intentionally empty so `make harden-check` runs
+# cleanly and the structure is reviewable before any change is applied.
+- name: Placeholder (users role is implemented in M1)
+  ansible.builtin.debug:
+    msg: "role 'users' not yet implemented"
+  changed_when: false
+  tags: [placeholder]

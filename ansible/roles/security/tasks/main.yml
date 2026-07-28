@@ -1,0 +1,9 @@
+---
+# Role: security — see ansible/roles/security/README.md
+# Implemented in M1. Intentionally empty so `make harden-check` runs
+# cleanly and the structure is reviewable before any change is applied.
+- name: Placeholder (security role is implemented in M1)
+  ansible.builtin.debug:
+    msg: "role 'security' not yet implemented"
+  changed_when: false
+  tags: [placeholder]

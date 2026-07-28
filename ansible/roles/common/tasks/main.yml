@@ -1,0 +1,9 @@
+---
+# Role: common — see ansible/roles/common/README.md
+# Implemented in M1. Intentionally empty so `make harden-check` runs
+# cleanly and the structure is reviewable before any change is applied.
+- name: Placeholder (common role is implemented in M1)
+  ansible.builtin.debug:
+    msg: "role 'common' not yet implemented"
+  changed_when: false
+  tags: [placeholder]

@@ -1,0 +1,79 @@
+{# Template -> docs/generated/SERVICES.md  (ADR-0014) #}
+<!--
+  GENERATED FILE — DO NOT EDIT
+  Source:    {{ registry }}
+  Generator: {{ generator }}
+  Regenerate: make generate
+-->
+
+# Service Inventory
+
+Generated from [`{{ registry }}`](../../{{ registry }}). Do not edit by hand —
+add or change a service there and run `make generate`.
+
+## Deployed
+
+{% if enabled_services %}
+| Service | Hostname (prod) | Hostname (dev) | Port | Access | Networks | Health |
+|---|---|---|---|---|---|---|
+{% for svc in enabled_services %}
+| `{{ svc.name }}` | `{{ svc.name }}.$DOMAIN` | `{{ svc.name }}.dev.$DOMAIN` | {{ svc.port }} | {{ svc.access }} | {{ svc.networks | join(', ') }} | `{{ svc.healthcheck }}` |
+{% endfor %}
+{% else %}
+_None yet._ Every service below is declared but not deployed. Each milestone
+flips its `enabled` flag when it actually ships.
+{% endif %}
+
+## Declared, not yet deployed
+
+{% set pending = services | rejectattr('enabled') | list %}
+{% if pending %}
+| Service | Port | Access | Networks | Description |
+|---|---|---|---|---|
+{% for svc in pending %}
+| `{{ svc.name }}` | {{ svc.port }} | {{ svc.access }} | {{ svc.networks | join(', ') }} | {{ svc.description }} |
+{% endfor %}
+{% else %}
+_None._
+{% endif %}
+
+## How hostnames are derived
+
+No hostname is written by hand anywhere in this repository. Each is composed
+at runtime from three values:
+
+```
+<service name> + <env infix> + <domain>
+
+prod:  ENV_PREFIX=""      ->  n8n.maxrommel.de
+dev:   ENV_PREFIX=".dev"  ->  n8n.dev.maxrommel.de
+```
+
+`DOMAIN` and `ENV` live in `.env`; `ENV_PREFIX` is derived from `ENV` by
+`scripts/setup-env.sh`. Because `*.maxrommel.de` is a Cloudflare wildcard
+record, a new service needs no DNS change — only a tunnel ingress rule, which
+this generator produces.
+
+## Access control
+
+`access: private` means the hostname sits behind a **Cloudflare Access**
+policy: authentication happens at Cloudflare's edge, before traffic reaches
+the server. A service's own login (n8n's, for example) is then a second layer,
+not the only one.
+
+> **Manual verification required.** Access policies are configured in the
+> Cloudflare Zero Trust dashboard and cannot be expressed in the tunnel config.
+> This table is the intended state; the dashboard is the actual state. Audit
+> them against each other whenever a service is added — see `docs/milestones/M3.md`.
+
+## Network segmentation
+
+| Network | Purpose | Who joins |
+|---|---|---|
+| `edge` | Tunnel ↔ reverse proxy | `cloudflared`, `caddy` |
+| `apps` | Application containers | `caddy` + every app |
+| `data` | Databases | `postgres`, `redis`, and only apps that need them |
+
+A container reaches PostgreSQL only if it is explicitly placed on `data`.
+This is what keeps a future MCP server or agent from touching the database
+by default. See ADR-0004.

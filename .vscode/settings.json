@@ -1,0 +1,21 @@
+{
+  // Generated files are read-only by convention (ADR-0014). Marking them
+  // here makes accidental edits obvious in the file tree.
+  "files.readonlyInclude": {
+    "compose/generated/**": true,
+    "docs/generated/**": true
+  },
+  "files.associations": {
+    "Caddyfile": "caddyfile",
+    "*.j2": "jinja",
+    "env.example": "dotenv"
+  },
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/playbook": "ansible/site.yml"
+  },
+  "[python]": { "editor.tabSize": 4 },
+  "[makefile]": { "editor.insertSpaces": false },
+  "editor.rulers": [88],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true
+}

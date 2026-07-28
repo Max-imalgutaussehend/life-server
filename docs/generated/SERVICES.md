@@ -1,0 +1,67 @@
+<!--
+  GENERATED FILE — DO NOT EDIT
+  Source:    services.yml
+  Generator: generator/render.py
+  Regenerate: make generate
+-->
+
+# Service Inventory
+
+Generated from [`services.yml`](../../services.yml). Do not edit by hand —
+add or change a service there and run `make generate`.
+
+## Deployed
+
+_None yet._ Every service below is declared but not deployed. Each milestone
+flips its `enabled` flag when it actually ships.
+
+## Declared, not yet deployed
+
+| Service | Port | Access | Networks | Description |
+|---|---|---|---|---|
+| `n8n` | 5678 | private | apps, data | Workflow automation and integration engine |
+| `paperclip` | 8080 | private | apps, data | Paperclip application |
+| `hermes` | 8081 | private | apps, data | Hermes agent manager |
+| `status` | 3001 | private | apps | Uptime Kuma — service monitoring and alerting |
+| `ntfy` | 80 | private | apps | Push notification relay for alerts |
+
+## How hostnames are derived
+
+No hostname is written by hand anywhere in this repository. Each is composed
+at runtime from three values:
+
+```
+<service name> + <env infix> + <domain>
+
+prod:  ENV_PREFIX=""      ->  n8n.maxrommel.de
+dev:   ENV_PREFIX=".dev"  ->  n8n.dev.maxrommel.de
+```
+
+`DOMAIN` and `ENV` live in `.env`; `ENV_PREFIX` is derived from `ENV` by
+`scripts/setup-env.sh`. Because `*.maxrommel.de` is a Cloudflare wildcard
+record, a new service needs no DNS change — only a tunnel ingress rule, which
+this generator produces.
+
+## Access control
+
+`access: private` means the hostname sits behind a **Cloudflare Access**
+policy: authentication happens at Cloudflare's edge, before traffic reaches
+the server. A service's own login (n8n's, for example) is then a second layer,
+not the only one.
+
+> **Manual verification required.** Access policies are configured in the
+> Cloudflare Zero Trust dashboard and cannot be expressed in the tunnel config.
+> This table is the intended state; the dashboard is the actual state. Audit
+> them against each other whenever a service is added — see `docs/milestones/M3.md`.
+
+## Network segmentation
+
+| Network | Purpose | Who joins |
+|---|---|---|
+| `edge` | Tunnel ↔ reverse proxy | `cloudflared`, `caddy` |
+| `apps` | Application containers | `caddy` + every app |
+| `data` | Databases | `postgres`, `redis`, and only apps that need them |
+
+A container reaches PostgreSQL only if it is explicitly placed on `data`.
+This is what keeps a future MCP server or agent from touching the database
+by default. See ADR-0004.

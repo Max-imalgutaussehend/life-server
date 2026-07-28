@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "redhat.ansible",
+    "ms-azuretools.vscode-docker",
+    "redhat.vscode-yaml",
+    "timonwong.shellcheck",
+    "matthewpi.caddyfile-support",
+    "samuelcolvin.jinjahtml",
+    "mikestead.dotenv",
+    "bierner.markdown-mermaid"
+  ]
+}
