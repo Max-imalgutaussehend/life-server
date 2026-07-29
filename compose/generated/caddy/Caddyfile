@@ -18,6 +18,13 @@
 #   certificates for every site address and fail, because nothing can reach
 #   it on :443 from outside.
 #
+#   THE `http://` PREFIX ON EACH SITE ADDRESS IS LOAD-BEARING.
+#   A bare `host.example.com {` makes Caddy listen on :443 for that site EVEN
+#   WITH auto_https off — the port is inferred from the address, not from the
+#   TLS setting. The tunnel connects to caddy:80, so those sites would never
+#   match and every request fell through to the :80 healthz block, returning
+#   an empty 200. Cost hours to find; do not remove the prefix.
+#
 # HOSTNAMES ARE NOT HARDCODED
 #   {$DOMAIN} and {$ENV_PREFIX} are resolved by Caddy at startup from the
 #   environment (fed by .env). One generated file is therefore correct for
@@ -35,16 +42,23 @@
 	}
 }
 
-# Health endpoint for the container's own healthcheck and for Uptime Kuma.
-# Bound to :80 on the internal network only.
-:80 {
+# Health endpoint for the container's own healthcheck and for Uptime Kuma,
+# plus the catch-all for unregistered hostnames.
+#
+# WHY THE 404 MATTERS
+#   The tunnel's dashboard rule is a wildcard (*.domain), so EVERY subdomain
+#   reaches Caddy — including ones with no service. Without an explicit 404
+#   these fell through to the healthz block and returned an empty 200, which
+#   looks like "it works" and hides typos. Unregistered hosts must fail loudly.
+http://:80 {
 	respond /healthz "ok" 200
+	respond "no service registered for this hostname" 404
 }
 
 # ── whoami — Connectivity test target — echoes request headers
 #    access: public
 #    networks: apps
-whoami{$ENV_PREFIX}.{$DOMAIN} {
+http://whoami{$ENV_PREFIX}.{$DOMAIN} {
 	# Upstream is the container name, resolved by Docker's embedded DNS.
 	# {$ENV_PREFIX_NAME} yields e.g. "prod-" so the target is prod-whoami.
 	reverse_proxy {$ENV_PREFIX_NAME}whoami:8000 {

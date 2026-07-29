@@ -53,7 +53,7 @@ services:
     image: cloudflare/cloudflared:2025.11.1
     container_name: ${ENV_PREFIX_NAME:-prod-}cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate --loglevel debug run
+    command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is not set in .env}
       TUNNEL_METRICS: 0.0.0.0:2000
