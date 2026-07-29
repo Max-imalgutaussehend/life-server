@@ -128,6 +128,49 @@
   # report the OLD config and the assertion would fail misleadingly.
   when: not ansible_check_mode
 
+- name: Determine whether sshd uses socket activation
+  # Ubuntu 24.04 defaults to ssh.socket: the socket owns port 22 and spawns
+  # ssh.service on demand. That is workable, but every service restart opens a
+  # window where connections are REFUSED rather than queued — which is exactly
+  # what bit this host mid-session (`is-active: active` while
+  # `is-enabled: disabled`, and SSH refusing connections).
+  #
+  # A server that always wants sshd listening gains nothing from socket
+  # activation, so this pins the classic model: ssh.service enabled, socket off.
+  ansible.builtin.command:
+    cmd: systemctl is-enabled ssh.socket
+  register: ssh_socket_state
+  changed_when: false
+  failed_when: false
+
+- name: Stop and disable ssh.socket
+  # Order matters: the socket must release port 22 before ssh.service can bind
+  # it. Doing this in one step avoids a window where neither is listening.
+  ansible.builtin.systemd:
+    name: ssh.socket
+    enabled: false
+    state: stopped
+  when: "'enabled' in ssh_socket_state.stdout"
+
+- name: Enable and start ssh.service
+  # `enabled: true` is the important half — without it sshd survives until the
+  # next reboot and then never comes back, locking you out of a box whose only
+  # other entry point is the provider console.
+  ansible.builtin.systemd:
+    name: ssh.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Verify sshd will start on boot
+  # Assert rather than assume: this is the single setting whose silent failure
+  # costs you the server on the next reboot.
+  ansible.builtin.command:
+    cmd: systemctl is-enabled ssh.service
+  register: ssh_enabled_check
+  changed_when: false
+  failed_when: "'enabled' not in ssh_enabled_check.stdout"
+
 - name: Flush handlers so sshd restarts before the play ends
   # Without this the restart happens at the very end; we want it here so the
   # post_tasks verification in site.yml tests the NEW config.
