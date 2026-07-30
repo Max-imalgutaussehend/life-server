@@ -74,7 +74,14 @@ trades it for three times the operational surface.
 
 ## Follow-up
 
-- [ ] M4: init script creating databases, roles, revoking PUBLIC
-- [ ] M4: set per-role connection limits
-- [ ] M4: verify from n8n's container that connecting to `paperclip` DB fails
+- [x] M4: init script creating databases, roles, revoking PUBLIC
+      — `compose/postgres/initdb/10-roles-and-databases.sh`
+- [x] M4: set per-role connection limits — 20 each, asserted by `make verify-data`
+- [x] M4: verify from n8n's container that connecting to `paperclip` DB fails
+      — all six cross-database pairs refused; see `docs/milestones/M4.md`
 - [ ] M5: single `pg_dumpall` covers every database
+
+**M4 note.** `log_statement = 'ddl'` logs `CREATE ROLE ... PASSWORD` in
+plaintext. Any future script that sets a role password must open its session
+with `SET log_statement = 'none'`. See the HAZARD note in
+`compose/postgres/postgresql.conf`.

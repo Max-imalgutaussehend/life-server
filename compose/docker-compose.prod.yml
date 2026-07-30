@@ -107,6 +107,109 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  # One instance; one database and one role per service (ADR-0005). The
+  # superuser bootstraps those roles and is used by nothing else.
+  #
+  # ON `data` ONLY. Not `apps`, not `edge`. `net-data` is internal: true, so
+  # this container has no route to the internet and cannot be reached from
+  # anything that has not explicitly joined `data` (ADR-0004). Combined with
+  # no `ports:`, the database is unreachable from the host and the world.
+  postgres:
+    image: postgres:17.7-alpine
+    container_name: ${ENV_PREFIX_NAME:-prod-}postgres
+    restart: unless-stopped
+    # Replaces the image's postgresql.conf wholesale — see that file's header.
+    command: -c config_file=/etc/postgresql/postgresql.conf
+    environment:
+      # The image's own bootstrap variables. POSTGRES_SUPER_* is the .env
+      # naming (ADR-0006); mapped here rather than renamed in .env, because
+      # the image only reads POSTGRES_USER/POSTGRES_PASSWORD.
+      POSTGRES_USER: ${POSTGRES_SUPER_USER:?POSTGRES_SUPER_USER is not set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPER_PASSWORD:?POSTGRES_SUPER_PASSWORD is not set in .env}
+      # Deliberately NOT one of the service databases: `postgres` stays the
+      # maintenance database so no application DB is special.
+      POSTGRES_DB: postgres
+      # Data in a subdirectory of the mount, not at its root. Without this, a
+      # lost+found or any stray file makes Postgres refuse to initialise.
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Europe/Berlin}
+      # Which services the init script provisions. Kept here so the script
+      # does not restate the service list (ADR-0014).
+      POSTGRES_SERVICES: "n8n paperclip hermes"
+      POSTGRES_N8N_PASSWORD: ${POSTGRES_N8N_PASSWORD:?POSTGRES_N8N_PASSWORD is not set in .env}
+      POSTGRES_PAPERCLIP_PASSWORD: ${POSTGRES_PAPERCLIP_PASSWORD:?POSTGRES_PAPERCLIP_PASSWORD is not set in .env}
+      POSTGRES_HERMES_PASSWORD: ${POSTGRES_HERMES_PASSWORD:?POSTGRES_HERMES_PASSWORD is not set in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory only (ADR-0005).
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      data:
+        # Lets a service reach `postgres` without knowing the ${ENV} prefix,
+        # matching the `caddy` alias rationale above.
+        aliases:
+          - postgres
+    healthcheck:
+      # -h 127.0.0.1 forces a real TCP check. Without it pg_isready can pass
+      # against the unix socket while TCP — how every client connects — is
+      # still refusing. start_period covers first-boot role provisioning.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres -h 127.0.0.1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    # Hard cap above the ~1 GB config budget, so a runaway query is contained
+    # instead of taking the host down with it.
+    deploy:
+      resources:
+        limits:
+          memory: 1280M
+    security_opt:
+      - no-new-privileges:true
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  # Queue backend for n8n (M6) and cache for later services. Same network
+  # reasoning as Postgres: `data` only, no published port.
+  redis:
+    image: redis:7.4.6-alpine
+    container_name: ${ENV_PREFIX_NAME:-prod-}redis
+    restart: unless-stopped
+    # The password comes from the environment at startup, never from the
+    # committed config file (ADR-0006). sh -c so $REDIS_PASSWORD is expanded by
+    # the container's shell — $$ keeps Compose from substituting it here.
+    command: >
+      sh -c 'exec redis-server /usr/local/etc/redis/redis.conf
+      --requirepass "$$REDIS_PASSWORD"'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is not set in .env}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      data:
+        aliases:
+          - redis
+    healthcheck:
+      # Authenticated ping: an unauthenticated one would pass even if
+      # requirepass were silently misconfigured, which is the failure that
+      # matters here. --no-auth-warning keeps the log readable.
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          # Above redis.conf's 256MB maxmemory, leaving room for AOF rewrite
+          # and copy-on-write during a background save.
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+
   # ── whoami — the vertical slice test target ───────────────────────────────
   # Minimal HTTP server that echoes request details. Proves the whole path
   # works: Cloudflare -> tunnel -> Caddy -> container. Removed once a real
@@ -127,3 +230,12 @@ volumes:
     name: ${ENV_PREFIX_NAME:-prod-}caddy-data
   caddy_config:
     name: ${ENV_PREFIX_NAME:-prod-}caddy-config
+
+  # The two volumes that hold irreplaceable state. Everything else in this
+  # stack can be rebuilt from Git; these cannot. They are the reason M5
+  # (backups + a rehearsed restore) must land before the first real service
+  # writes data here (ADR-0009).
+  postgres_data:
+    name: ${ENV_PREFIX_NAME:-prod-}postgres-data
+  redis_data:
+    name: ${ENV_PREFIX_NAME:-prod-}redis-data

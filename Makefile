@@ -143,6 +143,18 @@ health: ## [M2] Health status of every running container
 		| awk -F"\t" "{printf \"  %-24s %s\\n\", \$$1, \$$2}" \
 		|| echo "docker not installed yet (M2)"'
 
+.PHONY: verify-data
+verify-data: ## [M4] Prove per-service DB isolation and Redis auth on the server
+	@test -f scripts/verify-data-layer.sh || { echo "$(ERR)M4 not built yet$(OFF)"; exit 1; }
+	@./scripts/deploy.sh --sync-only >/dev/null
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'bash /opt/life-server/scripts/verify-data-layer.sh'
+
+.PHONY: psql
+psql: ## [M4] Open a psql shell (DB=n8n for a service database)
+	@ssh -i $(SSH_KEY) -t deploy@$(SERVER_IP) \
+		'docker exec -it $(ENV_PREFIX_NAME)postgres psql -U $(POSTGRES_SUPER_USER) -d $(or $(DB),postgres)'
+
 .PHONY: deploy-stack
 deploy-stack: ## [M2] Sync repo to server and start the stack
 	@./scripts/deploy.sh

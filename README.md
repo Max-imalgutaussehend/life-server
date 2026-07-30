@@ -131,11 +131,11 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | | Milestone | Delivers |
 |---|---|---|
 | M0 | Repository | ✅ ADRs, generator, tooling |
-| M1 | Host baseline | `deploy` user, SSH hardening, UFW, fail2ban |
-| M2 | Docker platform | Docker, segmented networks, filesystem layout |
-| M3 | Ingress | Cloudflare Tunnel + Caddy + Access |
-| M4 | Data | PostgreSQL, Redis, per-service roles |
-| M5 | Backups | restic offsite + **rehearsed restore** |
+| M1 | Host baseline | ✅ `deploy` user, SSH hardening, UFW, fail2ban |
+| M2 | Docker platform | ✅ Docker, segmented networks, filesystem layout |
+| M3 | Ingress | ✅ Cloudflare Tunnel + Caddy |
+| M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
+| M5 | Backups | ⬅ **next** — restic offsite + **rehearsed restore** |
 | M6 | n8n | First real service, end to end |
 | M7 | Deployment | GHCR pull-based deploys, SOPS |
 | M8 | Monitoring | Uptime Kuma, ntfy alerts |
