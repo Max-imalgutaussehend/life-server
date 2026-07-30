@@ -91,11 +91,15 @@ services:
     description: "Uptime Kuma — service monitoring and alerting"
     networks: [apps]
     access: private
-    enabled: false # -> true in M8
+    enabled: true # M8
 
+  # NOTE: ntfy is access: private like everything else, but its push endpoint is
+  # what a phone subscribes to. Cloudflare Access gates browsers, not the ntfy
+  # app — so mobile push needs either the app's Access service-token support or
+  # a deliberate public topic. Decided in M8; see docs/milestones/M8.md.
   - name: ntfy
     port: 80
     description: "Push notification relay for alerts"
     networks: [apps]
     access: private
-    enabled: false # -> true in M8
+    enabled: true # M8

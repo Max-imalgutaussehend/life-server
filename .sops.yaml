@@ -1,0 +1,24 @@
+# =============================================================================
+# .sops.yaml — which key encrypts which file. (ADR-0006, Phase 2)
+# =============================================================================
+#
+# WHY THIS FILE EXISTS
+#   Without it, every `sops` invocation needs `--age <recipient>` on the command
+#   line. That is one flag away from encrypting a secret to the wrong key, or to
+#   no key at all — and you find out when you cannot decrypt it. Declaring the
+#   recipients here means `sops secrets.enc.env` is always correct.
+#
+# WHAT IS ENCRYPTED
+#   Only secrets.enc.env. env.example stays plaintext on purpose: it is the
+#   committed contract of WHICH variables exist, and it holds no values.
+#
+# ADDING A RECIPIENT (e.g. GitHub Actions in M7)
+#   Append its public key below, then re-encrypt so the new key can read it:
+#     sops updatekeys secrets.enc.env
+#   ADR-0006 requires Actions to get its OWN key, never a copy of the
+#   operator's — a leaked CI key must be revocable without rotating yours.
+# =============================================================================
+
+creation_rules:
+  - path_regex: secrets\.enc\.env$
+    age: age1vw5ug8y0y7cvdzq5lzu64365kv8yyl5pmypwq5x2xvycw293f94savz8us

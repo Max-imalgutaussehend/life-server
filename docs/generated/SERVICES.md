@@ -16,6 +16,8 @@ add or change a service there and run `make generate`.
 |---|---|---|---|---|---|---|
 | `whoami` | `whoami.$DOMAIN` | `whoami.dev.$DOMAIN` | 8000 | public | apps | `/` |
 | `n8n` | `n8n.$DOMAIN` | `n8n.dev.$DOMAIN` | 5678 | private | apps, data | `/healthz` |
+| `status` | `status.$DOMAIN` | `status.dev.$DOMAIN` | 3001 | private | apps | `/` |
+| `ntfy` | `ntfy.$DOMAIN` | `ntfy.dev.$DOMAIN` | 80 | private | apps | `/` |
 
 ## Declared, not yet deployed
 
@@ -23,8 +25,6 @@ add or change a service there and run `make generate`.
 |---|---|---|---|---|
 | `paperclip` | 8080 | private | apps, data | Paperclip application |
 | `hermes` | 8081 | private | apps, data | Hermes agent manager |
-| `status` | 3001 | private | apps | Uptime Kuma — service monitoring and alerting |
-| `ntfy` | 80 | private | apps | Push notification relay for alerts |
 
 ## How hostnames are derived
 

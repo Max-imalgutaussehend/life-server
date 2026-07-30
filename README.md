@@ -3,9 +3,14 @@
 Personal AI infrastructure on a single Hetzner VPS. Ubuntu 24.04, everything in
 Docker, everything reproducible from this repository.
 
-> **Status:** M0 complete — repository, decisions and tooling. The server has
-> been reached and inspected but not yet configured. See
-> [`docs/milestones/`](docs/milestones/) for what each milestone delivered.
+> **Status:** M0–M5 and M8 complete. The stack is live: Cloudflare Tunnel →
+> Caddy → n8n, on PostgreSQL and Redis, with restic backups (restore rehearsed,
+> off-host copy verified) and Uptime Kuma + ntfy alerting proven by a real
+> outage. See [`docs/milestones/`](docs/milestones/) for each milestone.
+>
+> ⚠️ **Action required:** three hostnames are internet-reachable behind only
+> their own logins. See **[`docs/OPERATOR-TASKS.md`](docs/OPERATOR-TASKS.md)** —
+> task 1 needs the Cloudflare dashboard.
 
 ## Quick start
 
@@ -136,11 +141,11 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M3 | Ingress | ✅ Cloudflare Tunnel + Caddy |
 | M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
 | M5 | Backups | ✅ restic, rehearsed restore, off-host copy on the laptop |
-| M6 | n8n | 🔶 running, owner claimed — **still needs a Cloudflare Access policy** ([M6](docs/milestones/M6.md)) |
-| M7 | Deployment | GHCR pull-based deploys, SOPS |
-| M8 | Monitoring | Uptime Kuma, ntfy alerts |
+| M6 | n8n | 🔶 running, owner claimed — needs an Access policy ([M6](docs/milestones/M6.md)) |
+| M7 | Deployment | 🔶 SOPS done (secrets encrypted in Git); GHCR blocked — no git remote |
+| M8 | Monitoring | ✅ Uptime Kuma + ntfy — outage → alert verified ([M8](docs/milestones/M8.md)) |
 | M8.5 | Remote access | ⚠️ **Tailscale ruled out** (work-laptop policy) — needs redesign, likely Cloudflare Access SSH. Goal unchanged: port 22 closed |
-| M9 | Applications | Paperclip, Hermes, audit log, dev stack |
+| M9 | Applications | ⛔ blocked — Paperclip/Hermes not specified yet |
 
 ## Requirements
 

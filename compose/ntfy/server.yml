@@ -1,0 +1,69 @@
+# =============================================================================
+# server.yml — ntfy, the alert relay (M8)
+# =============================================================================
+#
+# WHAT NTFY IS FOR HERE
+#   Uptime Kuma detects that something is down; ntfy is how that reaches your
+#   phone. Without it, monitoring only helps when you are already looking at
+#   the dashboard — which is exactly when you least need it.
+#
+# WHY SELF-HOSTED RATHER THAN ntfy.sh
+#   The public instance works and is free, but alert contents would transit a
+#   third party, and the topic name is the only secret. Self-hosted keeps
+#   operational detail on infrastructure already trusted with the services it
+#   reports on.
+#
+# THE ACCESS PROBLEM, STATED HONESTLY
+#   Every other service here is gated by Cloudflare Access, which authenticates
+#   a BROWSER. The ntfy mobile app is not a browser: it holds a long-lived
+#   subscription and cannot complete an Access login flow. So either
+#     (a) the phone subscribes over a path Access does not gate, or
+#     (b) auth happens inside ntfy itself, with tokens the app can carry.
+#   This file takes (b): ntfy denies anonymous access, and the phone uses an
+#   access token. See docs/milestones/M8.md for the token creation step.
+# =============================================================================
+
+# Public-facing URL. ntfy builds subscription URLs and links from this, so a
+# wrong value produces notifications whose "open" action goes nowhere.
+base-url: "https://ntfy.maxrommel.de"
+
+# Bind inside the container only. No host port is published; Caddy reaches this
+# over the apps network (ADR-0003, ADR-0004).
+listen-http: ":80"
+
+# --- Storage ----------------------------------------------------------------
+# Messages are cached so a phone that was offline still receives them on
+# reconnect. Without a cache file this is memory-only and a restart loses
+# anything undelivered.
+cache-file: "/var/cache/ntfy/cache.db"
+cache-duration: "12h"
+
+# Attachment support is deliberately not configured: alerts are text, and an
+# upload endpoint is attack surface with no corresponding need.
+
+auth-file: "/var/lib/ntfy/user.db"
+
+# --- THE LOAD-BEARING LINE --------------------------------------------------
+# deny-all means an anonymous request can neither publish nor subscribe. The
+# default is read-write for everyone, which on a reachable host means anyone
+# can both read your alerts and forge them.
+#
+# Access is granted explicitly per user/topic with `ntfy access`, which is a
+# one-time setup step documented in M8.
+auth-default-access: "deny-all"
+
+# --- Behaviour --------------------------------------------------------------
+# Keep the write path narrow: this instance exists to relay a handful of alerts
+# from Uptime Kuma, not to serve arbitrary clients.
+enable-signup: false
+enable-login: true
+web-root: "app"
+
+# Upstream push relay. Required for iOS notifications to arrive when the app is
+# backgrounded; harmless on Android. It forwards only a message ID and topic,
+# not payload, so no alert content reaches the relay.
+upstream-base-url: "https://ntfy.sh"
+
+behind-proxy: true
+
+log-level: "info"

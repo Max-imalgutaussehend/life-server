@@ -71,7 +71,22 @@ backup scope from M5. It is the one file that Git does not protect.
 
 ## Follow-up
 
-- [ ] M5: verify `.env` is included in the restic backup set
-- [ ] M7: install SOPS+age, encrypt `.env` to `secrets.enc.env`, commit it
+- [x] M5: verify `.env` is included in the restic backup set — asserted every run
+- [x] M7: install SOPS+age, encrypt `.env` to `secrets.enc.env`, commit it
+      — `.sops.yaml` declares the recipient; `make secrets-verify` proves the
+      encrypted file round-trips to the live `.env`
 - [ ] M7: give GitHub Actions its own age key, not a copy of the operator's
-- [ ] M7: update this ADR's status to note Phase 2 is active
+      — **blocked: the repository has no remote yet**
+- [x] M7: Phase 2 is active for the operator; the CI half is still pending
+
+**Phase 2 notes (2026-07-30).** Key names stay in plaintext inside
+`secrets.enc.env` and only values are encrypted, so a diff shows *which* secret
+changed without revealing any value — rotation stays auditable. `.env` remains
+the file every tool reads; `secrets.enc.env` is the committed, recoverable copy.
+`make secrets-verify` fails loudly when the two drift, which is the failure mode
+that would otherwise surface during a restore.
+
+The age **private** key lives at `~/.config/sops/age/keys.txt`, outside the
+repository, and `.gitignore` now blocks `keys.txt` / `*.agekey` as a safety net.
+Losing it makes `secrets.enc.env` permanently undecryptable — it belongs in a
+password manager alongside `RESTIC_PASSWORD`.

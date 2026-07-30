@@ -317,6 +317,88 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ── Uptime Kuma ───────────────────────────────────────────────────────────
+  # Service monitoring (M8). Chosen over Portainer-style tooling because it
+  # needs no Docker socket — it makes HTTP requests like any other client, so a
+  # compromise here does not become root on the host (ADR-0008).
+  #
+  # THE LIMITATION THIS DOES NOT SOLVE
+  #   Kuma runs inside the stack it watches. If the host dies, or Docker dies,
+  #   Kuma dies with it and sends nothing — the classic "who watches the
+  #   watchman" gap. It reliably catches ONE service failing, which is the
+  #   common case; it cannot report its own death. An external check (a free
+  #   Uptime Robot hitting /healthz, or Healthchecks.io watching the backup
+  #   timer) is the honest complement, and is listed as M8 follow-up.
+  status:
+    image: louislam/uptime-kuma:2.4.0
+    container_name: ${ENV_PREFIX_NAME:-prod-}status
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      # Kuma is behind Caddy behind the tunnel; without this it builds links
+      # against the container's own hostname.
+      UPTIME_KUMA_PORT: 3001
+    volumes:
+      - status_data:/app/data
+    networks:
+      # apps only. Kuma checks services over HTTP through the apps network and
+      # reaches ntfy the same way. It is deliberately NOT on data — a monitor
+      # has no business being able to open a database socket (ADR-0004).
+      - apps
+    healthcheck:
+      # curl, NOT wget: the Kuma 2.x image ships curl and has no wget, so a
+      # wget probe fails with "not found" and reports the service unhealthy
+      # while it is actually fine. Verified what the image contains rather than
+      # assuming the busybox toolset other images provide.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    security_opt:
+      - no-new-privileges:true
+
+  # ── ntfy ──────────────────────────────────────────────────────────────────
+  # Push relay: turns "Kuma noticed something" into a notification on your
+  # phone. Monitoring that only shows up on a dashboard helps precisely when
+  # you are already watching, which is when you need it least.
+  #
+  # Config is a mounted file rather than environment variables because the
+  # access-control defaults matter and belong somewhere reviewable — see
+  # ntfy/server.yml, particularly auth-default-access: deny-all.
+  ntfy:
+    image: binwiederhier/ntfy:v2.26.3
+    container_name: ${ENV_PREFIX_NAME:-prod-}ntfy
+    restart: unless-stopped
+    # `serve` is required: the image's entrypoint is the ntfy binary itself, so
+    # without a subcommand it prints help and exits.
+    command: serve
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./ntfy/server.yml:/etc/ntfy/server.yml:ro
+      - ntfy_data:/var/lib/ntfy      # user.db — accounts and per-topic ACLs
+      - ntfy_cache:/var/cache/ntfy   # undelivered messages across restarts
+    networks:
+      - apps
+    healthcheck:
+      # /v1/health is ntfy's own endpoint and returns JSON with "healthy":true.
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:80/v1/health | grep -q 'true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+
   # ── whoami — the vertical slice test target ───────────────────────────────
   # Minimal HTTP server that echoes request details. Proves the whole path
   # works: Cloudflare -> tunnel -> Caddy -> container. Removed once a real
@@ -348,3 +430,9 @@ volumes:
     name: ${ENV_PREFIX_NAME:-prod-}redis-data
   n8n_data:
     name: ${ENV_PREFIX_NAME:-prod-}n8n-data
+  status_data:
+    name: ${ENV_PREFIX_NAME:-prod-}status-data
+  ntfy_data:
+    name: ${ENV_PREFIX_NAME:-prod-}ntfy-data
+  ntfy_cache:
+    name: ${ENV_PREFIX_NAME:-prod-}ntfy-cache

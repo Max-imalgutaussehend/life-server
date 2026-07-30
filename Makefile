@@ -163,6 +163,57 @@ deploy-stack: ## [M2] Sync repo to server and start the stack
 sync: ## [M2] Sync repo to server without restarting anything
 	@./scripts/deploy.sh --sync-only
 
+.PHONY: secrets-encrypt
+secrets-encrypt: ## [M7] Encrypt .env -> secrets.enc.env (commit the result)
+	@command -v sops >/dev/null || { echo "$(ERR)sops missing: brew install sops age$(OFF)"; exit 1; }
+	@test -f .env || { echo "$(ERR).env missing. Run: make setup$(OFF)"; exit 1; }
+	@cp .env secrets.enc.env
+	@sops --encrypt --in-place secrets.enc.env
+	@echo "$(OK)secrets.enc.env written — commit it$(OFF)"
+
+.PHONY: secrets-decrypt
+secrets-decrypt: ## [M7] Rebuild .env from secrets.enc.env (needs the age key)
+	@command -v sops >/dev/null || { echo "$(ERR)sops missing: brew install sops age$(OFF)"; exit 1; }
+	@test -f secrets.enc.env || { echo "$(ERR)secrets.enc.env missing$(OFF)"; exit 1; }
+	@test ! -f .env || cp .env .env.before-decrypt
+	@sops --decrypt secrets.enc.env > .env
+	@chmod 600 .env
+	@echo "$(OK).env restored (previous copy: .env.before-decrypt)$(OFF)"
+
+.PHONY: secrets-edit
+secrets-edit: ## [M7] Edit secrets in place, encrypted at rest
+	@sops secrets.enc.env
+
+.PHONY: secrets-verify
+secrets-verify: ## [M7] Prove secrets.enc.env round-trips to the live .env
+	@command -v sops >/dev/null || { echo "$(ERR)sops missing$(OFF)"; exit 1; }
+	@sops --decrypt secrets.enc.env > /tmp/.sops-verify 2>/dev/null \
+		|| { echo "$(ERR)cannot decrypt — is the age key present?$(OFF)"; exit 1; }
+	@if diff <(grep -E '^[A-Z_]+=' .env | sort) \
+		<(grep -E '^[A-Z_]+=' /tmp/.sops-verify | sort) >/dev/null; then \
+		echo "$(OK)all $$(grep -cE '^[A-Z_]+=' .env) secrets match$(OFF)"; \
+	else \
+		echo "$(ERR)secrets.enc.env is STALE — run: make secrets-encrypt$(OFF)"; \
+		diff <(grep -oE '^[A-Z_]+' .env | sort) \
+			<(grep -oE '^[A-Z_]+' /tmp/.sops-verify | sort) | head; \
+		rm -f /tmp/.sops-verify; exit 1; \
+	fi
+	@rm -f /tmp/.sops-verify
+
+.PHONY: seed-monitors
+seed-monitors: ## [M8] Create Uptime Kuma monitors + ntfy channel (idempotent)
+	@./scripts/deploy.sh --sync-only >/dev/null
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'bash /opt/life-server/scripts/seed-monitors.sh'
+
+.PHONY: alert-test
+alert-test: ## [M8] Send a test notification through ntfy
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'cd /opt/life-server && set -a && . ./.env && set +a && \
+		docker exec -e NTFY_USER="kuma:$$KUMA_ADMIN_PASSWORD" $(ENV_PREFIX_NAME)ntfy \
+		ntfy publish --title="life-server test" --tags=bell \
+		"http://localhost:80/$$NTFY_TOPIC" "Test notification from make alert-test"'
+
 .PHONY: deploy
 deploy: ## [M7] Pull latest images and restart
 	@echo "$(ERR)not built yet — M7$(OFF)"; exit 1

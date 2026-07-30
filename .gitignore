@@ -14,6 +14,17 @@
 ansible/inventory.local.ini
 .vault-pass
 
+# ── age / SOPS private keys (M7, ADR-0006) ──────────────────────────────
+# The age PRIVATE key decrypts every committed secret. It lives in
+# ~/.config/sops/age/keys.txt, deliberately outside the repo — these patterns
+# are the safety net for a copy that ends up here by accident.
+#
+# NOTE: secrets.enc.env is NOT ignored. It is encrypted and MUST be committed;
+# that is the entire point of Phase 2.
+keys.txt
+*.agekey
+age-key*.txt
+
 # ── Python (generator) ──────────────────────────────────────────────────
 __pycache__/
 *.py[cod]

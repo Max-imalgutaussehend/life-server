@@ -40,6 +40,14 @@ ingress:
   - hostname: "n8n${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
+  # status — Uptime Kuma — service monitoring and alerting [access: private]
+  - hostname: "status${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
+  # ntfy — Push notification relay for alerts [access: private]
+  - hostname: "ntfy${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
   # Catch-all. Required by cloudflared: the last rule must have no hostname.
   # Anything not matched above is refused rather than silently routed.
   - service: http_status:404
