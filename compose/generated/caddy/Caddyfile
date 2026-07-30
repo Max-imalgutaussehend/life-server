@@ -72,3 +72,20 @@ http://whoami{$ENV_PREFIX}.{$DOMAIN} {
 	}
 }
 
+# ── n8n — Workflow automation and integration engine
+#    access: private (Cloudflare Access enforces auth at the edge)
+#    networks: apps, data
+http://n8n{$ENV_PREFIX}.{$DOMAIN} {
+	# Upstream is the container name, resolved by Docker's embedded DNS.
+	# {$ENV_PREFIX_NAME} yields e.g. "prod-" so the target is prod-n8n.
+	reverse_proxy {$ENV_PREFIX_NAME}n8n:5678 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto https
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+

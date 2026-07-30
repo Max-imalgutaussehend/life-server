@@ -15,12 +15,12 @@ add or change a service there and run `make generate`.
 | Service | Hostname (prod) | Hostname (dev) | Port | Access | Networks | Health |
 |---|---|---|---|---|---|---|
 | `whoami` | `whoami.$DOMAIN` | `whoami.dev.$DOMAIN` | 8000 | public | apps | `/` |
+| `n8n` | `n8n.$DOMAIN` | `n8n.dev.$DOMAIN` | 5678 | private | apps, data | `/healthz` |
 
 ## Declared, not yet deployed
 
 | Service | Port | Access | Networks | Description |
 |---|---|---|---|---|
-| `n8n` | 5678 | private | apps, data | Workflow automation and integration engine |
 | `paperclip` | 8080 | private | apps, data | Paperclip application |
 | `hermes` | 8081 | private | apps, data | Hermes agent manager |
 | `status` | 3001 | private | apps | Uptime Kuma — service monitoring and alerting |

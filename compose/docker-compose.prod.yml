@@ -210,6 +210,113 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ── n8n ───────────────────────────────────────────────────────────────────
+  # The first real service (M6). Workflow automation; holds credentials for
+  # everything it integrates with, which makes it the most security-sensitive
+  # thing on the host so far.
+  #
+  # ON BOTH `apps` AND `data`: Caddy reaches it over `apps`, and it reaches
+  # Postgres and Redis over `data`. It is NOT on `edge` — nothing but Caddy and
+  # the tunnel belongs there (ADR-0004).
+  #
+  # AUTHENTICATION IS AT THE EDGE, NOT HERE.
+  #   `access: private` in services.yml means Cloudflare Access gates this
+  #   hostname before a request ever reaches the tunnel. n8n's own user
+  #   management is a second layer, not the primary one. If the Access policy is
+  #   missing, this is exposed to the internet — see docs/milestones/M6.md for
+  #   the audit step. That policy is a manual dashboard action (ADR-0003).
+  n8n:
+    image: n8nio/n8n:2.32.6
+    container_name: ${ENV_PREFIX_NAME:-prod-}n8n
+    restart: unless-stopped
+    environment:
+      # --- Database ---------------------------------------------------------
+      # Its own database and role, no rights to any other (ADR-0005).
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_N8N_PASSWORD:?POSTGRES_N8N_PASSWORD is not set in .env}
+
+      # --- Credential encryption -------------------------------------------
+      # Encrypts every credential n8n stores. If this value is lost or changed,
+      # every stored credential becomes unreadable — the single most important
+      # variable here, and the reason .env must be in the backup set (ADR-0009).
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY is not set in .env}
+
+      # --- Public URL and proxy awareness -----------------------------------
+      # n8n builds webhook URLs and OAuth callbacks from these. Wrong values
+      # produce webhooks that point somewhere unreachable — a failure that only
+      # shows up when an external service tries to call back.
+      N8N_HOST: n8n${ENV_PREFIX-}.${DOMAIN:?DOMAIN is not set in .env}
+      N8N_PORT: 5678
+      # https even though the internal hop is http: this describes the PUBLIC
+      # scheme, which is what belongs in a webhook URL. Cloudflare terminates
+      # TLS (ADR-0003).
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://n8n${ENV_PREFIX-}.${DOMAIN}/
+      N8N_EDITOR_BASE_URL: https://n8n${ENV_PREFIX-}.${DOMAIN}/
+      # Trust the proxy in front of us so client IPs in logs are real rather
+      # than the Docker bridge address.
+      N8N_PROXY_HOPS: 1
+
+      # --- Operational ------------------------------------------------------
+      GENERIC_TIMEZONE: ${TZ:-Europe/Berlin}
+      TZ: ${TZ:-Europe/Berlin}
+      # Prune execution history. Without this the executions table grows
+      # without limit and eventually dominates both the database and backups.
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: 336        # hours (14 days)
+      # Keep failures longer than successes: a failure you cannot inspect is
+      # the one you needed.
+      EXECUTIONS_DATA_SAVE_ON_ERROR: all
+      EXECUTIONS_DATA_SAVE_ON_SUCCESS: all
+      EXECUTIONS_DATA_SAVE_ON_PROGRESS: "false"
+
+      # Opt out of telemetry and version-check callouts.
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_TEMPLATES_ENABLED: "false"
+      # Silence the "permissions 0644 are too wide" nag on the config file and
+      # enforce the stricter mode it wants.
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+
+      # Block filesystem access from Code nodes. n8n is reachable by exactly
+      # one authenticated operator, but a workflow that reads /etc is still a
+      # capability nothing here needs.
+      NODES_EXCLUDE: '["n8n-nodes-base.readWriteFile","n8n-nodes-base.executeCommand"]'
+    volumes:
+      # Holds the instance ID and settings file. The DATA that matters lives in
+      # Postgres, so this volume is small — but it is still in the backup set.
+      - n8n_data:/home/node/.n8n
+    networks:
+      - apps
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # /healthz is n8n's own endpoint and the path declared in services.yml.
+      # wget rather than curl: the image ships busybox wget, not curl.
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # n8n runs database migrations on first boot, which on a cold start takes
+      # appreciably longer than a normal restart.
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          # Node's default heap plus workflow execution overhead. Bounded so a
+          # runaway workflow cannot take the host down with it.
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
+
   # ── whoami — the vertical slice test target ───────────────────────────────
   # Minimal HTTP server that echoes request details. Proves the whole path
   # works: Cloudflare -> tunnel -> Caddy -> container. Removed once a real
@@ -239,3 +346,5 @@ volumes:
     name: ${ENV_PREFIX_NAME:-prod-}postgres-data
   redis_data:
     name: ${ENV_PREFIX_NAME:-prod-}redis-data
+  n8n_data:
+    name: ${ENV_PREFIX_NAME:-prod-}n8n-data

@@ -70,7 +70,7 @@ services:
     networks: [apps, data]
     access: private
     healthcheck: /healthz
-    enabled: false # -> true in M6
+    enabled: true # M6
 
   - name: paperclip
     port: 8080

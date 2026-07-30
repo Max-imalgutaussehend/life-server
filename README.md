@@ -136,7 +136,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M3 | Ingress | ✅ Cloudflare Tunnel + Caddy |
 | M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
 | M5 | Backups | ✅ restic, rehearsed restore, off-host copy on the laptop |
-| M6 | n8n | ⬅ **next** — first real service, end to end |
+| M6 | n8n | 🔶 built + verified — **needs a Cloudflare Access policy before starting** ([M6](docs/milestones/M6.md)) |
 | M7 | Deployment | GHCR pull-based deploys, SOPS |
 | M8 | Monitoring | Uptime Kuma, ntfy alerts |
 | M8.5 | Remote access | ⚠️ **Tailscale ruled out** (work-laptop policy) — needs redesign, likely Cloudflare Access SSH. Goal unchanged: port 22 closed |

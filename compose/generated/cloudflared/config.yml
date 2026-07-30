@@ -36,6 +36,10 @@ ingress:
   - hostname: "whoami${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
+  # n8n — Workflow automation and integration engine [access: private]
+  - hostname: "n8n${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
   # Catch-all. Required by cloudflared: the last rule must have no hostname.
   # Anything not matched above is refused rather than silently routed.
   - service: http_status:404

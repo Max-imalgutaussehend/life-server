@@ -65,6 +65,35 @@ ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" "
 		up -d --remove-orphans
 "
 
+# Caddy's routes come from a BIND-MOUNTED generated file. Changing that file on
+# disk does not change the container's definition, so `compose up -d` leaves the
+# old routes loaded and a newly registered service silently returns the
+# catch-all 404. Found exactly that way when n8n was added in M6.
+#
+# `caddy reload` is not an option: the Caddyfile sets `admin off`, so there is no
+# admin API to push config to — deliberately. Restarting the container is the
+# supported path and costs a sub-second blip on a proxy that holds no state.
+#
+# Only restarts when the loaded config actually differs, so a routine deploy
+# does not needlessly bounce ingress.
+CADDY_CONTAINER="$(grep -E '^ENV_PREFIX_NAME=' "$REPO/.env" 2>/dev/null | cut -d= -f2- || true)"
+CADDY_CONTAINER="${CADDY_CONTAINER:-prod-}caddy"
+
+echo "==> checking Caddy's loaded routes"
+ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" "
+	set -euo pipefail
+	cd $REMOTE_DIR
+	on_disk=\$(sha256sum compose/generated/caddy/Caddyfile | cut -d' ' -f1)
+	loaded=\$(docker exec $CADDY_CONTAINER sha256sum /etc/caddy/Caddyfile 2>/dev/null | cut -d' ' -f1 || echo none)
+	if [ \"\$on_disk\" != \"\$loaded\" ]; then
+		echo '    generated Caddyfile changed — restarting Caddy'
+		docker restart $CADDY_CONTAINER >/dev/null
+		sleep 3
+	else
+		echo '    routes current'
+	fi
+"
+
 echo "==> container status"
 ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" \
 	"docker ps --format 'table {{.Names}}\t{{.Status}}'"
