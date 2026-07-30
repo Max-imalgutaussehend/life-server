@@ -71,7 +71,31 @@ mitigated by key-only auth, rate limiting and fail2ban.
 
 ## Follow-up
 
-- [ ] M1: `ufw limit 22/tcp`, key-only, root login disabled
+- [x] M1: `ufw limit 22/tcp`, key-only, root login disabled
 - [ ] M1: confirm the root password is stored before hardening
-- [ ] M8.5: install Tailscale, verify connect/disconnect/reconnect
+- [ ] ~~M8.5: install Tailscale, verify connect/disconnect/reconnect~~ — **blocked**
 - [ ] M8.5: close port 22, then verify console access still works
+
+## Constraint discovered 2026-07-30: Tailscale is not available
+
+The operator's work laptop prohibits Tailscale by policy. **Phase 2 as written
+above cannot be executed**, so this ADR's mechanism — not its goal — is dead.
+
+What is unaffected: Phase 1 is in place and verified (key-only, root disabled,
+`ufw limit`, fail2ban — 1056 failed attempts and 95 bans absorbed so far), and
+the Hetzner console fallback is untouched.
+
+What needs a decision at M8.5: the replacement path. The leading candidate is
+**Cloudflare Tunnel's SSH support behind Access** — no client software, no VPN,
+browser-authenticated against the operator's identity, and it reuses the tunnel
+already running for web traffic (ADR-0003). It reaches the same end state of
+zero public inbound ports, and is *less* exposed than today's open port 22,
+trading that for a Cloudflare dependency on the admin path.
+
+This ADR is **not amended to adopt that** — the choice is unconfirmed, and a
+superseding ADR belongs to M8.5 where the mechanism is actually built and
+verified. Recorded here so the constraint is not rediscovered later.
+
+Note that a server-side tailnet would still be viable if administration ever
+happens from a personal machine; the blocker is client-side policy, not the
+server.

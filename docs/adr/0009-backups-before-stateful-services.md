@@ -76,9 +76,10 @@ means regenerating every secret and losing every n8n stored credential.
 - [x] M5: verify `.env` is in the backup set — asserted on every run
 - [x] M5: **rehearse a restore against a throwaway database** — passing
 - [x] M5: document the restore procedure step by step — `docs/milestones/M5.md`
-- [ ] **M5 INCOMPLETE: the repository is still local (`/srv/restic`).** This
-      does not satisfy the decision above. Blocks M6.
+- [x] M5: **off-host copy** — two tiers, see below. Restore verified from the
+      off-host copy with no server contact. M6 unblocked.
 - [ ] M8: alert on backup failure via ntfy
+- [ ] optional: automate tier 2 with a cloud remote to remove the freshness caveat
 
 **Deviation, recorded.** This ADR anticipated a restic *container*. M5 runs
 restic as a host package under a systemd timer instead: a container would need
@@ -86,6 +87,26 @@ the Docker socket plus host mounts to read volumes and dump Postgres, which is a
 larger attack surface than a root script on a timer, for no benefit. The intent
 of this ADR — scheduled, monitored, encrypted, off-host — is unaffected.
 
-**The hard gate stands.** "After M5, no service that stores data ships until its
-data is in the backup set." A local repository does not survive the disk or host
-loss it exists for, so M6 waits on `RESTIC_REPOSITORY` moving off-host.
+**How the off-host requirement was met (2026-07-30).** Not with the anticipated
+cloud repository, but with two tiers:
+
+| Tier | Where | Trigger |
+|---|---|---|
+| 1 | `/srv/restic` on the server | systemd timer, daily |
+| 2 | the operator's laptop, via `make backup-pull` | on demand |
+
+Tier 2 is different hardware, in a different building, on a different provider's
+account, so it survives the disk, host and account loss this ADR is concerned
+with. It was verified by restoring `.env` and the `pg_dumpall` output from the
+laptop copy **with the server uninvolved** — the only test that answers whether
+data can actually be recovered.
+
+**Residual risk, accepted knowingly:** tier 2 is manual, so the off-host copy is
+only as fresh as the last pull. `make backup-pull-status` exits non-zero once it
+is over a week old, making staleness visible instead of silent. A cloud remote
+would automate this tier and remains available as a drop-in
+(`RESTIC_REPOSITORY=s3:...`) without touching any script.
+
+**The hard gate is satisfied, not waived.** "After M5, no service that stores
+data ships until its data is in the backup set" — n8n's data will be in both
+tiers from its first backup.

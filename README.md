@@ -135,11 +135,11 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M2 | Docker platform | ✅ Docker, segmented networks, filesystem layout |
 | M3 | Ingress | ✅ Cloudflare Tunnel + Caddy |
 | M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
-| M5 | Backups | ⚠️ restic + rehearsed restore done — **repository still local** |
-| M6 | n8n | ⛔ gated: move the backup repository off-host first |
+| M5 | Backups | ✅ restic, rehearsed restore, off-host copy on the laptop |
+| M6 | n8n | ⬅ **next** — first real service, end to end |
 | M7 | Deployment | GHCR pull-based deploys, SOPS |
 | M8 | Monitoring | Uptime Kuma, ntfy alerts |
-| M8.5 | Tailscale | SSH off the public internet, port 22 closed |
+| M8.5 | Remote access | ⚠️ **Tailscale ruled out** (work-laptop policy) — needs redesign, likely Cloudflare Access SSH. Goal unchanged: port 22 closed |
 | M9 | Applications | Paperclip, Hermes, audit log, dev stack |
 
 ## Requirements

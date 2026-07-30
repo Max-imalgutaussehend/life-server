@@ -179,6 +179,18 @@ restore: ## [M5] Rehearse a restore into a throwaway database (safe)
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
 		'sudo /opt/life-server/scripts/restore.sh --rehearse'
 
+.PHONY: backup-pull
+backup-pull: ## [M5] Copy the server's backup repository to this machine (off-host)
+	@./scripts/backup-pull.sh
+
+.PHONY: backup-pull-verify
+backup-pull-verify: ## [M5] Pull, then verify the local copy is restorable
+	@./scripts/backup-pull.sh --verify
+
+.PHONY: backup-pull-status
+backup-pull-status: ## [M5] How old is this machine's off-host copy?
+	@./scripts/backup-pull.sh --status
+
 .PHONY: restore-list
 restore-list: ## [M5] List available snapshots
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
