@@ -1,0 +1,21 @@
+# Managed by Ansible (roles/backup). Local edits are overwritten.
+
+[Unit]
+Description=Run the life-server backup daily
+Documentation=file://{{ life_server_dir }}/docs/milestones/M5.md
+
+[Timer]
+OnCalendar={{ backup_schedule }}
+
+# Run a missed backup on the next boot. Without this, a host that was down at
+# the scheduled time simply has no backup for that day and says nothing.
+Persistent=true
+
+# Spread the start over a window so the backup never coincides exactly with
+# unattended-upgrades' {{ unattended_reboot_time }} reboot.
+RandomizedDelaySec={{ backup_randomized_delay_sec }}
+
+Unit=life-server-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -16,6 +16,7 @@
 #   verify_access -> PROVE deploy can log in and sudo, or abort
 #   security      -> only now disable root login and password auth
 #   docker        -> platform
+#   backup        -> restic + timers; needs docker to dump Postgres (M5)
 #
 # If verify_access fails the play stops with root access still enabled.
 # =============================================================================
@@ -54,6 +55,7 @@
     - role: verify_access   # lockout rehearsal — must pass before security
     - role: security
     - role: docker
+    - role: backup          # after docker: the backup dumps Postgres via docker exec
 
   post_tasks:
     - name: Confirm sshd rejects passwords and root login

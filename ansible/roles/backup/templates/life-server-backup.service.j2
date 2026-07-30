@@ -1,0 +1,46 @@
+# Managed by Ansible (roles/backup). Local edits are overwritten.
+#
+# Type=oneshot: this runs to completion rather than staying resident, so
+# systemd treats a non-zero exit as a failed unit — which is exactly the
+# signal M8 will alert on (ADR-0009).
+
+[Unit]
+Description=life-server restic backup
+Documentation=file://{{ life_server_dir }}/docs/milestones/M5.md
+# Docker must be up: the backup dumps Postgres via `docker exec`.
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ life_server_dir }}/scripts/backup.sh
+
+# Runs as root: it reads .env (0600 root), Docker volume contents, and drives
+# `docker exec`. Narrowing this would mean granting docker-socket access to a
+# dedicated user, which is equivalent to root on this host anyway.
+User=root
+
+# A stuck network or repository must not wedge the unit forever; the timer
+# would then never fire again.
+TimeoutStartSec={{ backup_timeout_sec }}
+
+# Never let the backup starve the services it protects. The whole point is
+# that taking a backup is invisible to everything else on a 3.7 GB host.
+Nice=10
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+
+# --- Hardening --------------------------------------------------------------
+# Deliberately NOT PrivateTmp: restore.sh uses /tmp for scratch extraction and
+# an operator inspecting it afterwards would find an empty directory.
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+# Output to the journal, tagged so `journalctl -t life-server-backup` finds it.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=life-server-backup

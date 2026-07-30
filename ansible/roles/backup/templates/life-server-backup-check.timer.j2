@@ -1,0 +1,15 @@
+# Managed by Ansible (roles/backup). Local edits are overwritten.
+
+[Unit]
+Description=Run the life-server backup with a full integrity check weekly
+Documentation=file://{{ life_server_dir }}/docs/milestones/M5.md
+
+[Timer]
+OnCalendar={{ backup_check_schedule }}
+Persistent=true
+RandomizedDelaySec={{ backup_randomized_delay_sec }}
+
+Unit=life-server-backup-check.service
+
+[Install]
+WantedBy=timers.target

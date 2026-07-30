@@ -1,0 +1,39 @@
+# Managed by Ansible (roles/backup). Local edits are overwritten.
+#
+# The weekly deep check. Identical to the daily unit except for --check, which
+# makes restic read every pack file rather than only verifying structure.
+#
+# WHY SEPARATE FROM THE DAILY BACKUP
+#   Reading all pack data is the only way to catch silent bit rot, but it costs
+#   a full read of the repository. Daily is wasteful — and once the repository
+#   is remote, that read is metered egress. Weekly is the compromise.
+
+[Unit]
+Description=life-server restic backup with full integrity check
+Documentation=file://{{ life_server_dir }}/docs/milestones/M5.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart={{ life_server_dir }}/scripts/backup.sh --check
+User=root
+
+# Longer than the daily unit: a full read of every pack file is the slowest
+# operation this milestone performs.
+TimeoutStartSec={{ backup_check_timeout_sec }}
+
+Nice=15
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=life-server-backup-check

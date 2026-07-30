@@ -169,11 +169,26 @@ deploy: ## [M7] Pull latest images and restart
 
 .PHONY: backup
 backup: ## [M5] Run a backup now
-	@echo "$(ERR)not built yet — M5$(OFF)"; exit 1
+	@./scripts/deploy.sh --sync-only >/dev/null
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'sudo /opt/life-server/scripts/backup.sh'
 
 .PHONY: restore
-restore: ## [M5] Restore from backup (interactive)
-	@echo "$(ERR)not built yet — M5$(OFF)"; exit 1
+restore: ## [M5] Rehearse a restore into a throwaway database (safe)
+	@./scripts/deploy.sh --sync-only >/dev/null
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'sudo /opt/life-server/scripts/restore.sh --rehearse'
+
+.PHONY: restore-list
+restore-list: ## [M5] List available snapshots
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'sudo /opt/life-server/scripts/restore.sh --list'
+
+.PHONY: backup-status
+backup-status: ## [M5] Show timer schedule and the last backup's result
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) '\
+		systemctl list-timers --all --no-pager "life-server-backup*"; \
+		echo; systemctl status life-server-backup.service --no-pager -n 15 || true'
 
 .PHONY: ssh
 ssh: ## Open a shell on the server

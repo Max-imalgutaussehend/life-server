@@ -72,8 +72,20 @@ means regenerating every secret and losing every n8n stored credential.
 
 ## Follow-up
 
-- [ ] M5: restic container and repository
-- [ ] M5: verify `.env` is in the backup set
-- [ ] M5: **rehearse a restore against a throwaway database**
-- [ ] M5: document the restore procedure step by step
+- [x] M5: restic **host package**, not a container — see deviation below
+- [x] M5: verify `.env` is in the backup set — asserted on every run
+- [x] M5: **rehearse a restore against a throwaway database** — passing
+- [x] M5: document the restore procedure step by step — `docs/milestones/M5.md`
+- [ ] **M5 INCOMPLETE: the repository is still local (`/srv/restic`).** This
+      does not satisfy the decision above. Blocks M6.
 - [ ] M8: alert on backup failure via ntfy
+
+**Deviation, recorded.** This ADR anticipated a restic *container*. M5 runs
+restic as a host package under a systemd timer instead: a container would need
+the Docker socket plus host mounts to read volumes and dump Postgres, which is a
+larger attack surface than a root script on a timer, for no benefit. The intent
+of this ADR — scheduled, monitored, encrypted, off-host — is unaffected.
+
+**The hard gate stands.** "After M5, no service that stores data ships until its
+data is in the backup set." A local repository does not survive the disk or host
+loss it exists for, so M6 waits on `RESTIC_REPOSITORY` moving off-host.

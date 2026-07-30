@@ -135,8 +135,8 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M2 | Docker platform | ✅ Docker, segmented networks, filesystem layout |
 | M3 | Ingress | ✅ Cloudflare Tunnel + Caddy |
 | M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
-| M5 | Backups | ⬅ **next** — restic offsite + **rehearsed restore** |
-| M6 | n8n | First real service, end to end |
+| M5 | Backups | ⚠️ restic + rehearsed restore done — **repository still local** |
+| M6 | n8n | ⛔ gated: move the backup repository off-host first |
 | M7 | Deployment | GHCR pull-based deploys, SOPS |
 | M8 | Monitoring | Uptime Kuma, ntfy alerts |
 | M8.5 | Tailscale | SSH off the public internet, port 22 closed |

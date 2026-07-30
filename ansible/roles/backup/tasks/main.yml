@@ -1,0 +1,107 @@
+---
+# backup — install restic and schedule it. Host concern, so Ansible owns it
+# (ADR-0001); the scripts it runs live in the repo and are synced by deploy.sh.
+#
+# WHY SYSTEMD TIMERS AND NOT CRON
+#   A cron job that fails writes to mail nobody reads. A systemd unit that
+#   fails is visible in `systemctl --failed`, keeps its output in the journal,
+#   and gives M8 a single thing to alert on (ADR-0009: a silently broken
+#   backup is worse than none).
+#
+#   Also: Persistent=true means a backup missed while the host was down runs
+#   on the next boot. Cron simply skips it.
+
+- name: Install restic
+  # Ubuntu 24.04 ships restic 0.16.x — recent enough, and staying on the
+  # distro package means unattended-upgrades patches it.
+  ansible.builtin.apt:
+    name: restic
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create the backup staging directory
+  # Holds the plaintext pg_dumpall output between dump and snapshot. 0700 and
+  # root-owned: it briefly contains every row in every database.
+  ansible.builtin.file:
+    path: /var/lib/life-server-backup
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install the backup service unit
+  ansible.builtin.template:
+    src: life-server-backup.service.j2
+    dest: /etc/systemd/system/life-server-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install the daily backup timer
+  ansible.builtin.template:
+    src: life-server-backup.timer.j2
+    dest: /etc/systemd/system/life-server-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install the weekly integrity-check service unit
+  # Separate unit because `restic check --read-data` reads every pack file.
+  # Cheap today, but it should not run daily once the repository is remote and
+  # egress is metered.
+  ansible.builtin.template:
+    src: life-server-backup-check.service.j2
+    dest: /etc/systemd/system/life-server-backup-check.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install the weekly integrity-check timer
+  ansible.builtin.template:
+    src: life-server-backup-check.timer.j2
+    dest: /etc/systemd/system/life-server-backup-check.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Flush handlers so systemd sees the new units before enabling them
+  # Without this, the enable below can run against a daemon that has not yet
+  # reloaded and fail on a unit it does not know about.
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the backup timers
+  # Skipped under --check: the templates above are not written in check mode, so
+  # systemd would be asked to enable units that do not exist yet. The failure
+  # would be an artefact of the dry run rather than a real problem.
+  when: not ansible_check_mode
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - life-server-backup.timer
+    - life-server-backup-check.timer
+
+- name: Read the scheduled timer state
+  when: not ansible_check_mode
+  # `enabled` only means the symlink exists. This asserts systemd has computed
+  # a next-run time — catching a malformed OnCalendar= that silently never
+  # fires, which would look exactly like a working backup until it was needed.
+  ansible.builtin.command:
+    cmd: systemctl list-timers --all --no-pager life-server-backup.timer
+  register: timer_state
+  changed_when: false
+
+- name: Assert the daily timer is scheduled
+  when: not ansible_check_mode
+  ansible.builtin.assert:
+    that: "'life-server-backup.timer' in timer_state.stdout"
+    success_msg: "Backup timer is scheduled."
+    fail_msg: >-
+      life-server-backup.timer is not scheduled. Check OnCalendar= in
+      /etc/systemd/system/life-server-backup.timer.

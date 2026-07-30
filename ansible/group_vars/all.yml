@@ -27,3 +27,24 @@ fail2ban_bantime: 1h
 
 # Unattended upgrades reboot at this time if a reboot is required.
 unattended_reboot_time: "04:00"
+
+# --- Backups (M5, ADR-0009) -------------------------------------------------
+# Where the repo is synced on the server. The systemd units call scripts from
+# here, so it must match REMOTE_DIR in scripts/deploy.sh.
+life_server_dir: /opt/life-server
+
+# 02:30 daily — after midnight churn, well before the 04:00 unattended-upgrades
+# reboot window, so a backup is never mid-flight when the host restarts.
+backup_schedule: "*-*-* 02:30:00"
+
+# Sunday 03:15: the weekly deep check. Deliberately not the same minute as the
+# daily timer, so the two never contend for the repository lock.
+backup_check_schedule: "Sun *-*-* 03:15:00"
+
+# Jitter. Also stops the backup landing on exactly the same second every day.
+backup_randomized_delay_sec: 300
+
+# Timeouts. Generous for today's ~80 MB set, but bounded: a hung repository
+# must fail rather than wedge the unit so the timer never fires again.
+backup_timeout_sec: 3600
+backup_check_timeout_sec: 7200
