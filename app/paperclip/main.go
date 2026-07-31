@@ -21,8 +21,10 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -90,6 +92,10 @@ type Event struct {
 type server struct {
 	db  *sql.DB
 	tpl *template.Template
+
+	// Shared secret for /api/*. Empty disables those endpoints entirely, so a
+	// misconfigured deployment fails closed rather than serving an open API.
+	agentToken string
 }
 
 func main() {
@@ -131,7 +137,15 @@ func main() {
 		log.Fatalf("parse templates: %v", err)
 	}
 
-	s := &server{db: db, tpl: tpl}
+	// Empty is allowed and disables /api/* — the UI still works. That is the
+	// right default: an agent API served without a token would be reachable by
+	// anything on the apps network.
+	agentToken := os.Getenv("AGENT_API_TOKEN")
+	if agentToken == "" {
+		log.Print("AGENT_API_TOKEN not set — the agent API is disabled")
+	}
+
+	s := &server{db: db, tpl: tpl, agentToken: agentToken}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealth)
@@ -139,6 +153,22 @@ func main() {
 	mux.HandleFunc("GET /ticket/{id}", s.handleTicket)
 	mux.HandleFunc("POST /ticket/{id}/status", s.handleStatus)
 	mux.HandleFunc("POST /goal", s.handleNewGoal)
+
+	// ── The agent API (M10, ADR-0019) ────────────────────────────────────
+	// The agent runner reaches tickets through THIS, never through a database
+	// connection string. That is the sandbox rule from M9: a session gets an
+	// interface, not credentials. If an agent is prompt-injected, the worst it
+	// can do here is claim and complete tickets — it cannot read another
+	// service's data, because it never holds a Postgres password.
+	//
+	// Guarded by a shared token rather than Access: the runner is a machine on
+	// the internal network and cannot complete a browser login. The endpoints
+	// are unreachable from the internet regardless, since Caddy only exposes
+	// this host and the agent network cannot route to it.
+	mux.HandleFunc("POST /api/claim", s.requireToken(s.handleAPIClaim))
+	mux.HandleFunc("POST /api/finish", s.requireToken(s.handleAPIFinish))
+	mux.HandleFunc("POST /api/children", s.requireToken(s.handleAPIChildren))
+	mux.HandleFunc("POST /api/event", s.requireToken(s.handleAPIEvent))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -407,6 +437,230 @@ func (s *server) handleNewGoal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// ── The agent API ───────────────────────────────────────────────────────────
+
+// requireToken gates the /api/* endpoints. A constant-time comparison, because
+// a naive == leaks the token one byte at a time to anyone who can measure.
+func (s *server) requireToken(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.agentToken == "" {
+			http.Error(w, "agent API disabled", http.StatusNotFound)
+			return
+		}
+		got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if subtle.ConstantTimeCompare([]byte(got), []byte(s.agentToken)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("write json: %v", err)
+	}
+}
+
+// handleAPIClaim hands out exactly one ticket, atomically.
+//
+// FOR UPDATE SKIP LOCKED is what makes concurrent runners safe: two agents
+// polling in the same instant cannot claim the same ticket, and neither blocks
+// waiting for the other.
+func (s *server) handleAPIClaim(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Role   string `json:"role"`
+		Runner string `json:"runner"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.Role != "ceo" && req.Role != "worker" {
+		http.Error(w, "role must be ceo or worker", http.StatusBadRequest)
+		return
+	}
+
+	var t Ticket
+	err := s.db.QueryRowContext(r.Context(), `
+		UPDATE tickets SET
+			status = 'claimed', claimed_by = $1, claimed_at = now(),
+			attempts = attempts + 1
+		WHERE id = (
+			SELECT id FROM tickets
+			WHERE status = 'open' AND role = $2
+			ORDER BY priority DESC, created_at
+			FOR UPDATE SKIP LOCKED
+			LIMIT 1
+		)
+		RETURNING `+ticketColumns, req.Runner, req.Role).Scan(
+		&t.ID, &t.Key, &t.Title, &t.Body, &t.Status, &t.Priority,
+		&t.Domain, &t.Role, &t.ParentID, &t.ClaimedBy, &t.Result, &t.LastError,
+		&t.Attempts, &t.CreatedAt, &t.UpdatedAt, &t.ClosedAt)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		// An empty queue is the normal case, not an error.
+		writeJSON(w, map[string]any{"ticket": nil})
+		return
+	} else if err != nil {
+		s.failJSON(w, "claim", err)
+		return
+	}
+
+	writeJSON(w, map[string]any{"ticket": map[string]any{
+		"id": t.ID, "title": t.Title, "body": t.Body,
+		"role": t.Role, "attempts": t.Attempts,
+	}})
+}
+
+func (s *server) handleAPIFinish(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID     int64  `json:"id"`
+		Status string `json:"status"`
+		Result string `json:"result"`
+		Error  string `json:"error"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Whitelist. 'done' and 'cancelled' are not here on purpose: an agent does
+	// not close its own work, a human does that through the review gate.
+	switch req.Status {
+	case "review", "failed", "open":
+	default:
+		http.Error(w, "status not allowed from an agent", http.StatusBadRequest)
+		return
+	}
+
+	// closed_at exactly for terminal states — the schema enforces this, and
+	// getting it wrong is what silently stuck every early worker ticket.
+	closed := "NULL"
+	if req.Status == "failed" {
+		closed = "now()"
+	}
+
+	if _, err := s.db.ExecContext(r.Context(), fmt.Sprintf(`
+		UPDATE tickets SET status = $1::ticket_status, claimed_by = NULL,
+			result = NULLIF($2, ''), last_error = NULLIF($3, ''), closed_at = %s
+		WHERE id = $4`, closed),
+		req.Status, req.Result, req.Error, req.ID); err != nil {
+		s.failJSON(w, "finish", err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+// handleAPIChildren turns a CEO's plan into worker tickets. Validation lives
+// here rather than in the agent: the runner is the untrusted party, and a
+// domain or priority the enum rejects would fail the whole insert.
+func (s *server) handleAPIChildren(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ParentID int64 `json:"parent_id"`
+		Children []struct {
+			Title    string `json:"title"`
+			Body     string `json:"body"`
+			Domain   string `json:"domain"`
+			Priority string `json:"priority"`
+		} `json:"children"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if len(req.Children) == 0 {
+		http.Error(w, "no children", http.StatusBadRequest)
+		return
+	}
+	if len(req.Children) > 20 {
+		// A CEO asked for at most 6. Twenty is already a runaway.
+		http.Error(w, "too many children", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := s.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		s.failJSON(w, "begin", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	for _, c := range req.Children {
+		title := strings.TrimSpace(c.Title)
+		if title == "" {
+			title = "untitled"
+		}
+		if len(title) > 500 {
+			title = title[:500]
+		}
+		if _, err := tx.ExecContext(r.Context(), `
+			INSERT INTO tickets (title, body, domain, priority, parent_id, role)
+			VALUES ($1, $2, $3, $4::ticket_priority, $5, 'worker')`,
+			title, c.Body, normaliseDomain(c.Domain), normalisePriority(c.Priority),
+			req.ParentID); err != nil {
+			s.failJSON(w, "insert child", err)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		s.failJSON(w, "commit", err)
+		return
+	}
+	writeJSON(w, map[string]any{"created": len(req.Children)})
+}
+
+func (s *server) handleAPIEvent(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		TicketID int64  `json:"ticket_id"`
+		Type     string `json:"type"`
+		Actor    string `json:"actor"`
+		Payload  string `json:"payload"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.Payload == "" {
+		req.Payload = "{}"
+	}
+	if _, err := s.db.ExecContext(r.Context(), `
+		INSERT INTO ticket_events (ticket_id, event_type, actor, payload)
+		VALUES ($1, $2, $3, $4::jsonb)`,
+		req.TicketID, req.Type, req.Actor, req.Payload); err != nil {
+		s.failJSON(w, "event", err)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+// Fall back rather than reject: one odd value should not lose a CEO's entire
+// plan, and the enum would refuse the insert outright.
+func normaliseDomain(d string) string {
+	switch d {
+	case "uni", "work", "jobsearch", "personal", "projects":
+		return d
+	default:
+		return "personal"
+	}
+}
+
+func normalisePriority(p string) string {
+	switch p {
+	case "low", "normal", "high", "urgent":
+		return p
+	default:
+		return "normal"
+	}
+}
+
+func (s *server) failJSON(w http.ResponseWriter, what string, err error) {
+	log.Printf("api %s: %v", what, err)
+	http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)
 }
 
 func (s *server) render(w http.ResponseWriter, name string, data any) {

@@ -16,6 +16,7 @@ add or change a service there and run `make generate`.
 |---|---|---|---|---|---|---|
 | `whoami` | `whoami.$DOMAIN` | `whoami.dev.$DOMAIN` | 8000 | public | apps | `/` |
 | `n8n` | `n8n.$DOMAIN` | `n8n.dev.$DOMAIN` | 5678 | private | apps, data | `/healthz` |
+| `paperclip` | `paperclip.$DOMAIN` | `paperclip.dev.$DOMAIN` | 8080 | private | apps, data | `/` |
 | `status` | `status.$DOMAIN` | `status.dev.$DOMAIN` | 3001 | private | apps | `/` |
 | `ntfy` | `ntfy.$DOMAIN` | `ntfy.dev.$DOMAIN` | 80 | private | apps | `/` |
 
@@ -23,7 +24,6 @@ add or change a service there and run `make generate`.
 
 | Service | Port | Access | Networks | Description |
 |---|---|---|---|---|
-| `paperclip` | 8080 | private | apps, data | Ticket UI for the agent system |
 | `hermes` | 8081 | private | apps, data | Hermes agent manager |
 
 ## How hostnames are derived

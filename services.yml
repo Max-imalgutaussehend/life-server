@@ -72,23 +72,20 @@ services:
     healthcheck: /healthz
     enabled: true # M6
 
-  # ⚠️ DELIBERATELY enabled: false while the Access application does not exist.
-  # The container runs and is reachable inside the apps network; only the PUBLIC
-  # route is withheld. Flipping this to true before the Cloudflare Access policy
-  # exists publishes a ticket queue — containing whatever the agents have been
-  # told about work, uni and job search — to the open internet.
+  # Access application created 2026-07-31, so the public route is on.
   #
-  # Verified 2026-07-31: with enabled: true and no policy, paperclip.maxrommel.de
-  # answered 200 to an unauthenticated request. Reverted within minutes.
-  #
-  # To publish: create the Access application (docs/OPERATOR-TASKS.md task 8),
-  # then set enabled: true, `make generate`, `make deploy-stack`.
+  # HISTORY WORTH KEEPING: this was briefly enabled BEFORE the Access policy
+  # existed, and paperclip.maxrommel.de answered 200 to an unauthenticated
+  # request — a public ticket queue holding whatever the agents know about work,
+  # uni and job search. Reverted within minutes. Verify gating by the redirect
+  # TARGET (cloudflareaccess.com), never by the status code: Uptime Kuma proved
+  # in M8 that a 302 can equally mean "the app redirected you itself".
   - name: paperclip
     port: 8080
     description: "Ticket UI for the agent system"
     networks: [apps, data]
     access: private
-    enabled: false # M9 — waiting on the Access policy, see above
+    enabled: true # M9
 
   - name: hermes
     port: 8081

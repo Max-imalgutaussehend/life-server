@@ -1,6 +1,12 @@
 # ADR-0017: Agent sessions run on the operator's machine, not the server
 
-- **Status:** Accepted
+- **Status:** ⚠️ **Superseded by [ADR-0019](0019-agents-run-on-the-server.md)**
+  (2026-07-31, same day). The premise below is correct — the Keychain credential
+  cannot be copied to Linux — but the conclusion was wrong. Only one question
+  was checked: whether the credential could be *copied*. `claude setup-token`
+  mints a portable long-lived token, which makes server-side agents possible
+  after all, and delivers the all-day operation this ADR explicitly gave up.
+  The sandbox reasoning and the ticket-store split carry over unchanged.
 - **Date:** 2026-07-31
 - **Milestone:** M9
 

@@ -86,6 +86,8 @@ EOF
 # ── 2. Other applications must be unreachable ───────────────────────────────
 # n8n holds credentials for everything it integrates with, which makes it the
 # most valuable target on the host after the database itself.
+#
+# paperclip is deliberately ABSENT from this list — see assertion 2b.
 while read -r host port; do
 	[ -n "$host" ] || continue
 	if probe_tcp "$host" "$port"; then
@@ -99,6 +101,30 @@ done <<-EOF
 	${PREFIX}ntfy 80
 	${PREFIX}status 3001
 EOF
+
+# ── 2b. Paperclip MUST be reachable, and MUST demand a token ────────────────
+# The one deliberate hole in the wall (M10, ADR-0019). The runner holds no
+# database credentials, so tickets have to arrive through Paperclip's API —
+# which makes Paperclip the narrow interface the M9 sandbox assumed.
+#
+# Reachability alone would be a regression, so this also asserts the API is
+# CLOSED without a token. An agent API reachable by anything on this network
+# would hand a prompt-injected session the entire ticket queue.
+if probe_tcp "${PREFIX}paperclip" 8080; then
+	ok "can reach ${PREFIX}paperclip:8080 (required — the ticket API)"
+
+	code="$(docker exec "$PROBE" sh -c \
+		"wget -qO- --server-response --timeout=5 --post-data='{}' \
+		 --header='Content-Type: application/json' \
+		 http://${PREFIX}paperclip:8080/api/claim 2>&1 | awk '/^  HTTP/{print \$2; exit}'" 2>/dev/null)"
+	case "$code" in
+		401|404) ok "the agent API rejects an unauthenticated request (HTTP ${code})" ;;
+		"")      bad "could not determine whether the agent API is authenticated" ;;
+		*)       bad "the agent API answered ${code} WITHOUT a token — it is open" ;;
+	esac
+else
+	bad "cannot reach ${PREFIX}paperclip:8080 — the runner cannot claim tickets"
+fi
 
 # ── 3. The Docker socket must be absent ─────────────────────────────────────
 # A mounted docker.sock is root on the host in one API call. This is the single
