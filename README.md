@@ -3,10 +3,11 @@
 Personal AI infrastructure on a single Hetzner VPS. Ubuntu 24.04, everything in
 Docker, everything reproducible from this repository.
 
-> **Status:** M0–M5 and M8 complete. The stack is live: Cloudflare Tunnel →
+> **Status:** M0–M5, M7 and M8 complete. The stack is live: Cloudflare Tunnel →
 > Caddy → n8n, on PostgreSQL and Redis, with restic backups (restore rehearsed,
-> off-host copy verified) and Uptime Kuma + ntfy alerting proven by a real
-> outage. See [`docs/milestones/`](docs/milestones/) for each milestone.
+> off-host copy verified), Uptime Kuma + ntfy alerting proven by a real outage,
+> and secrets encrypted in Git with CI enforcing the repository's invariants.
+> See [`docs/milestones/`](docs/milestones/) for each milestone.
 >
 > ⚠️ **Action required:** three hostnames are internet-reachable behind only
 > their own logins. See **[`docs/OPERATOR-TASKS.md`](docs/OPERATOR-TASKS.md)** —
@@ -142,7 +143,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
 | M5 | Backups | ✅ restic, rehearsed restore, off-host copy on the laptop |
 | M6 | n8n | 🔶 running, owner claimed — needs an Access policy ([M6](docs/milestones/M6.md)) |
-| M7 | Deployment | 🔶 SOPS done, CI has its own age key, `validate` workflow live — needs `gh secret set SOPS_AGE_KEY` ([tasks](docs/OPERATOR-TASKS.md)) |
+| M7 | Deployment | ✅ SOPS, CI with its own age key, `validate` workflow green on every push |
 | M8 | Monitoring | ✅ Uptime Kuma + ntfy — outage → alert verified ([M8](docs/milestones/M8.md)) |
 | M8.5 | Remote access | ⚠️ **Tailscale ruled out** (work-laptop policy) — needs redesign, likely Cloudflare Access SSH. Goal unchanged: port 22 closed |
 | M9 | Applications | ⛔ blocked — Paperclip/Hermes not specified yet |

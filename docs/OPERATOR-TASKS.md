@@ -108,20 +108,14 @@ redo.
 
 ---
 
-## 5. 🟡 M7: one command to finish CI
+## 5. ✅ M7: done — nothing left to do
 
-The repository is pushed, `.github/workflows/validate.yml` exists, and CI has its
-**own** age key — not a copy of yours (ADR-0006), so a leaked CI key is revoked by
-editing `.sops.yaml` without rotating anything of yours.
+`SOPS_AGE_KEY` was set on 2026-07-31 and all three jobs are green
+(`decrypted 24 variables with CI's key`, matching what your own key decrypts).
 
-One thing is missing: GitHub does not hold that key yet. Until you run this, the
-`secrets` job fails on every push.
-
-```bash
-gh secret set SOPS_AGE_KEY < ~/.config/sops/age/ci-key.txt
-```
-
-No dashboard needed. Check the result with `gh run list --limit 3`.
+CI has its **own** age key, not a copy of yours (ADR-0006). If it ever leaks:
+delete its recipient line from `.sops.yaml`, run `sops updatekeys secrets.enc.env`,
+commit. Your key is untouched and nothing you hold needs re-encrypting.
 
 **There is no GHCR build job, deliberately.** All eight images are pinned
 third-party images (ADR-0011) and the repository contains no Dockerfile — a build
