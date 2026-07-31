@@ -417,6 +417,63 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ── Paperclip ─────────────────────────────────────────────────────────────
+  # The ticket UI (M9). The repository's first FIRST-PARTY service — everything
+  # else here is a pinned third-party image, so this is the only `build:`.
+  #
+  # WHAT IT IS NOT: it does not run agents. Per ADR-0017 those run on the
+  # operator's Mac, because Claude Code's OAuth credential is Keychain-bound and
+  # cannot be copied here. This service reads and writes tickets, nothing more —
+  # so a compromise yields tickets, not a Claude account.
+  #
+  # ON `apps` AND `data`, deliberately NOT on `agent`: it holds the Postgres
+  # password, and the agent network exists precisely to keep code-executing
+  # sessions away from anything holding credentials (see verify-agent-sandbox).
+  #
+  # AUTHENTICATION IS AT THE EDGE. `access: private` in services.yml means
+  # Cloudflare Access gates paperclip.${DOMAIN} before a request reaches the
+  # tunnel. There is no login in the app: a second, weaker auth system would be
+  # a liability rather than a defence. If the Access policy is missing, this is
+  # exposed — see docs/OPERATOR-TASKS.md.
+  paperclip:
+    build:
+      context: ../app/paperclip
+    image: life-server/paperclip:0.1.0
+    container_name: ${ENV_PREFIX_NAME:-prod-}paperclip
+    restart: unless-stopped
+    environment:
+      # sslmode=disable is correct here and only here: the connection never
+      # leaves the internal `data` bridge, which has no route off the host
+      # (ADR-0004). TLS would encrypt a hop that cannot be observed.
+      DATABASE_URL: postgres://paperclip:${POSTGRES_PAPERCLIP_PASSWORD:?POSTGRES_PAPERCLIP_PASSWORD is not set in .env}@postgres:5432/paperclip?sslmode=disable
+      PORT: 8080
+      TZ: ${TZ:-Europe/Berlin}
+    networks:
+      - apps
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The binary probes itself. A scratch image has no curl and no wget, and
+      # /healthz pings the DATABASE rather than merely proving the process is
+      # alive — a health check that passes while the database is unreachable
+      # turns an outage into a mystery.
+      test: ["CMD", "/paperclip", "-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          # A static Go binary rendering one table. 128M is generous; it exists
+          # to contain a leak, not to be used.
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+
   # ── whoami — the vertical slice test target ───────────────────────────────
   # Minimal HTTP server that echoes request details. Proves the whole path
   # works: Cloudflare -> tunnel -> Caddy -> container. Removed once a real

@@ -7,9 +7,12 @@
 #   an SSH key, never touches the host, and has no credential that can change
 #   production. A compromised Actions run can, at worst, make this check lie.
 #
-#   There is also nothing to build: all eight images in compose/ are pinned
-#   third-party images (ADR-0011) and the repository contains no Dockerfile.
-#   A GHCR build/push job would have nothing to put in it.
+#   Since M9 there IS first-party code — app/paperclip, a Go service with its
+#   own Dockerfile — so this workflow vets and compiles it. It still does not
+#   push an image: the server builds `paperclip` locally from the synced
+#   source, which keeps ADR-0007's rule that CI holds no credential able to
+#   change production. A GHCR push becomes worthwhile when there is a second
+#   machine to pull it, and not before.
 #
 # WHAT IT DOES
 #   It catches the four mistakes that are cheap to make and expensive to find:
@@ -158,6 +161,21 @@ jobs:
       # repository and gets no exemption from the rules it enforces.
       - name: yamllint
         run: yamllint services.yml ansible/ .github/
+
+      # Added in M9, when the repository gained its first first-party code.
+      # `go vet` catches what the compiler accepts: printf arguments that do not
+      # match their format, unreachable code, lost struct tags.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: app/paperclip/go.sum
+
+      - name: go vet and build
+        working-directory: app/paperclip
+        run: |
+          go vet ./...
+          go build ./...
 
       # Run from ansible/ so ansible.cfg applies — it is what points at
       # inventory.ini and roles/, and without it --syntax-check parses an empty

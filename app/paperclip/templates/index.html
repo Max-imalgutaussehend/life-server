@@ -1,0 +1,55 @@
+{{define "index.html"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paperclip</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+	<h1>Paperclip</h1>
+	<p class="sub">
+		{{with index .Counts "review"}}<b>{{.}} waiting for you</b> · {{end}}
+		{{with index .Counts "open"}}{{.}} queued · {{end}}
+		{{with index .Counts "claimed"}}{{.}} running · {{end}}
+		{{with index .Counts "failed"}}<span class="bad">{{.}} failed</span> · {{end}}
+		{{.Total}} shown
+	</p>
+</header>
+
+<form method="post" action="/goal" class="goal">
+	<input type="text" name="goal" placeholder="Give the CEO agent a goal…" autocomplete="off" required>
+	<button type="submit">Add</button>
+</form>
+
+{{if not .Tickets}}
+	<p class="empty">No tickets yet. Add a goal above — the CEO agent will
+	break it into work when the runner next polls.</p>
+{{else}}
+<table>
+	<thead><tr>
+		<th>#</th><th>Status</th><th>Role</th><th>Title</th>
+		<th>Domain</th><th>Age</th>
+	</tr></thead>
+	<tbody>
+	{{range .Tickets}}
+		<tr class="{{if .NeedsMe}}row-review{{else if .Failed}}row-failed{{end}}">
+			<td class="num">{{.ID}}</td>
+			<td><span class="pill s-{{.Status}}">{{.Status}}</span></td>
+			<td class="dim">{{.Role}}</td>
+			<td><a href="/ticket/{{.ID}}">{{.Title}}</a></td>
+			<td class="dim">{{if .Domain.Valid}}{{.Domain.String}}{{end}}</td>
+			<td class="dim num">{{.Age}}</td>
+		</tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}
+
+<footer>
+	Agents run on the operator's machine (ADR-0017) — start them with
+	<code>make paperclip</code>. This page only reads and writes tickets.
+</footer>
+</body>
+</html>{{end}}

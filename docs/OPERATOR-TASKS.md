@@ -265,6 +265,57 @@ interactive and defeats automation. This needs a decision before step 3.
 
 ---
 
+## 8. 🔴 Publish the Paperclip UI — one Access application
+
+**The UI is built, deployed and healthy, but its public route is deliberately
+switched off.**
+
+`services.yml` has `paperclip` at `enabled: false` with a comment explaining
+why: when it was briefly enabled without an Access policy,
+`paperclip.maxrommel.de` answered **200 to an unauthenticated request** — a
+public ticket queue containing whatever the agents know about work, uni and job
+search. Reverted within minutes.
+
+Create the application exactly like the others:
+
+| Field | Value |
+|---|---|
+| Application name | `paperclip` |
+| Destination | Public hostname `paperclip` . `maxrommel.de`, path empty |
+| Session Duration | `24 hours` |
+| Policy | Allow → Include → **Emails** → `max.rml@web.de` |
+
+Then publish it:
+
+```bash
+# in services.yml set: enabled: true
+make generate && make deploy-stack
+curl -s -o /dev/null -D - https://paperclip.maxrommel.de/ | grep -i location
+# must point at cloudflareaccess.com
+```
+
+Until then the UI still works — it is simply only reachable from inside the
+server's `apps` network.
+
+---
+
+## 9. 🟡 Decide: how WhatsApp connects
+
+[ADR-0018](adr/0018-whatsapp-assistant.md) has the full reasoning. One choice:
+
+- **Meta WhatsApp Business Cloud API** (recommended) — official, free tier far
+  beyond personal use, ~15 minutes of dashboard setup, no risk to your account.
+- **An unofficial library** driving WhatsApp Web — no setup, but against
+  WhatsApp's terms, and your personal number can be banned.
+
+**No second LLM is needed.** The CEO agent already turns a sentence into
+tickets, and a WhatsApp message is a sentence — the bridge is transport, not
+intelligence. Routing over free providers would send your job-search and work
+messages through whichever vendor had quota that hour, which is the one thing
+this system is built to avoid.
+
+---
+
 ## Optional hardening, worth doing eventually
 
 - **MFA in n8n** (currently off) — Settings → *Two-factor authentication*.

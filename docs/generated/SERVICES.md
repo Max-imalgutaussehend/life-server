@@ -23,7 +23,7 @@ add or change a service there and run `make generate`.
 
 | Service | Port | Access | Networks | Description |
 |---|---|---|---|---|
-| `paperclip` | 8080 | private | apps, data | Paperclip application |
+| `paperclip` | 8080 | private | apps, data | Ticket UI for the agent system |
 | `hermes` | 8081 | private | apps, data | Hermes agent manager |
 
 ## How hostnames are derived
