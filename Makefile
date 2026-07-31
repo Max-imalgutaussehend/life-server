@@ -160,6 +160,13 @@ verify-data: ## [M4] Prove per-service DB isolation and Redis auth on the server
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
 		'bash /opt/life-server/scripts/verify-data-layer.sh'
 
+.PHONY: migrate
+migrate: ## [M9] Apply SQL migrations (DB=paperclip, MODE=--status|--dry-run)
+	@test -n "$(DB)" || { echo "$(ERR)DB= is required, e.g. make migrate DB=paperclip$(OFF)"; exit 1; }
+	@./scripts/deploy.sh --sync-only >/dev/null
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'bash /opt/life-server/scripts/migrate.sh $(DB) $(MODE)'
+
 .PHONY: psql
 psql: ## [M4] Open a psql shell (DB=n8n for a service database)
 	@ssh -i $(SSH_KEY) -t deploy@$(SERVER_IP) \
