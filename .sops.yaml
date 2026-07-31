@@ -21,4 +21,12 @@
 
 creation_rules:
   - path_regex: secrets\.enc\.env$
-    age: age1vw5ug8y0y7cvdzq5lzu64365kv8yyl5pmypwq5x2xvycw293f94savz8us
+    # Two SEPARATE recipients, deliberately (ADR-0006). CI holds its own key, not
+    # a copy of the operator's, so a leaked CI key is revoked by dropping it from
+    # this list and running `sops updatekeys` — without rotating the operator's
+    # key or re-encrypting anything the operator holds.
+    #   1st: operator  (~/.config/sops/age/keys.txt)
+    #   2nd: CI        (~/.config/sops/age/ci-key.txt -> GitHub secret SOPS_AGE_KEY)
+    age: >-
+      age1vw5ug8y0y7cvdzq5lzu64365kv8yyl5pmypwq5x2xvycw293f94savz8us,
+      age1pzrzrjcmgg0srhu3q4g4553fxsm0yumlyg8tdh57tjvy28k3yy7qmavlsr

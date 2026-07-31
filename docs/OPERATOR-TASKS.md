@@ -108,17 +108,29 @@ redo.
 
 ---
 
-## 5. 🟢 M7: GitHub Actions and GHCR
+## 5. 🟡 M7: one command to finish CI
 
-**Blocked on:** this repository has no remote.
+The repository is pushed, `.github/workflows/validate.yml` exists, and CI has its
+**own** age key — not a copy of yours (ADR-0006), so a leaked CI key is revoked by
+editing `.sops.yaml` without rotating anything of yours.
+
+One thing is missing: GitHub does not hold that key yet. Until you run this, the
+`secrets` job fails on every push.
 
 ```bash
-gh repo create life-server --private --source=. --push
+gh secret set SOPS_AGE_KEY < ~/.config/sops/age/ci-key.txt
 ```
 
-Then tell me, and I will add the build/push workflow. Per ADR-0007 the server
-pulls — CI never gets SSH access. Per ADR-0006 Actions gets its **own** age key,
-not a copy of yours, so a leaked CI key is revocable without rotating yours.
+No dashboard needed. Check the result with `gh run list --limit 3`.
+
+**There is no GHCR build job, deliberately.** All eight images are pinned
+third-party images (ADR-0011) and the repository contains no Dockerfile — a build
+job would have nothing to build. What CI does instead is enforce the invariants:
+generated files match `services.yml`, no `:latest`, no secret tracked,
+`secrets.enc.env` still decryptable by CI, plus the linters that `make lint`
+skips when they are not installed locally.
+
+Per ADR-0007 the server pulls; CI holds no SSH key and cannot reach the host.
 
 ---
 

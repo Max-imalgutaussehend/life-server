@@ -142,7 +142,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
 | M5 | Backups | ✅ restic, rehearsed restore, off-host copy on the laptop |
 | M6 | n8n | 🔶 running, owner claimed — needs an Access policy ([M6](docs/milestones/M6.md)) |
-| M7 | Deployment | 🔶 SOPS done (secrets encrypted in Git); GHCR blocked — no git remote |
+| M7 | Deployment | 🔶 SOPS done, CI has its own age key, `validate` workflow live — needs `gh secret set SOPS_AGE_KEY` ([tasks](docs/OPERATOR-TASKS.md)) |
 | M8 | Monitoring | ✅ Uptime Kuma + ntfy — outage → alert verified ([M8](docs/milestones/M8.md)) |
 | M8.5 | Remote access | ⚠️ **Tailscale ruled out** (work-laptop policy) — needs redesign, likely Cloudflare Access SSH. Goal unchanged: port 22 closed |
 | M9 | Applications | ⛔ blocked — Paperclip/Hermes not specified yet |

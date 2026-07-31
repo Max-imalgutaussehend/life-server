@@ -1,0 +1,176 @@
+# =============================================================================
+# validate.yml — enforce the repository's invariants on every push. (M7)
+# =============================================================================
+#
+# WHAT THIS IS NOT
+#   It is not a deploy pipeline. Per ADR-0007 the server PULLS; CI never holds
+#   an SSH key, never touches the host, and has no credential that can change
+#   production. A compromised Actions run can, at worst, make this check lie.
+#
+#   There is also nothing to build: all eight images in compose/ are pinned
+#   third-party images (ADR-0011) and the repository contains no Dockerfile.
+#   A GHCR build/push job would have nothing to put in it.
+#
+# WHAT IT DOES
+#   It catches the four mistakes that are cheap to make and expensive to find:
+#     1. committing generated output that no longer matches services.yml
+#     2. an unpinned :latest image sneaking in
+#     3. a real secret being tracked
+#     4. secrets.enc.env drifting out of CI's reach — the failure that only
+#        surfaces during a restore, i.e. the worst possible moment
+# =============================================================================
+
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Read-only. This workflow has no reason to write to the repository, and
+# stating so means a compromised action cannot push to main either.
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    name: repository invariants
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install generator dependencies
+        run: pip install --quiet pyyaml jinja2
+
+      # services.yml is the single source of truth (ADR-0014). If the committed
+      # Caddyfile, tunnel config, services.env or SERVICES.md differ from what
+      # services.yml renders, then the repo describes a system that does not
+      # exist. --check diffs without writing.
+      - name: Generated files are current
+        run: python3 generator/render.py --check
+
+      # ADR-0011. Grep rather than a parser on purpose: :latest is a literal
+      # string, and a parser would need the whole compose schema to say the
+      # same thing. `image:` lines only, so a comment mentioning latest is fine.
+      - name: No unpinned image tags
+        run: |
+          if grep -rnE '^\s*image:.*:latest' compose/ ; then
+            echo "::error::an image is pinned to :latest — see ADR-0011"
+            exit 1
+          fi
+          echo "all images pinned"
+
+      # The point is not "is .gitignore correct" but "is a secret tracked right
+      # now". git ls-files answers that directly; .gitignore only governs what
+      # happens next.
+      - name: No secrets tracked
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)(\.env(\..*)?|keys\.txt|.*\.agekey)$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::secret material is tracked in Git:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "no .env or age key tracked"
+
+  secrets:
+    name: secrets.enc.env decrypts with CI's key
+    runs-on: ubuntu-24.04
+    # Forks cannot read repository secrets, so this job would fail for a reason
+    # that says nothing about the code. Skip it there rather than fail loudly.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SOPS
+        run: |
+          curl -fsSL -o /tmp/sops \
+            https://github.com/getsops/sops/releases/download/v3.9.4/sops-v3.9.4.linux.amd64
+          sudo install -m 0755 /tmp/sops /usr/local/bin/sops
+          sops --version
+
+      # ADR-0006: Actions holds its OWN age key, not a copy of the operator's,
+      # so a leaked CI key is revoked by dropping one recipient from .sops.yaml
+      # — no rotation of the operator's key, no re-encryption they must redo.
+      #
+      # This step is the early warning for the failure that otherwise appears
+      # during a disaster restore: someone re-encrypted secrets.enc.env without
+      # `sops updatekeys`, silently dropping CI as a recipient.
+      - name: Decrypt with the CI key
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          if [ -z "${SOPS_AGE_KEY}" ]; then
+            echo "::error::secret SOPS_AGE_KEY is not set — see docs/OPERATOR-TASKS.md"
+            exit 1
+          fi
+          # Count keys only. The plaintext is never printed, never written to a
+          # file, and never becomes a step output — decryptability is the whole
+          # assertion, the values are not CI's business.
+          n=$(sops --decrypt secrets.enc.env | grep -cE '^[A-Z_][A-Z0-9_]*=' || true)
+          if [ "$n" -lt 10 ]; then
+            echo "::error::decrypted, but only $n variables — expected the full set"
+            exit 1
+          fi
+          echo "decrypted $n variables with CI's key"
+
+  lint:
+    name: shell, yaml, ansible, compose
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # `make lint` skips a linter that is not installed, which is right on a
+      # laptop and wrong here — a skipped check that reports success is worse
+      # than no check. So CI installs them and calls them directly.
+      - name: Install linters
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          pip install --quiet yamllint ansible ansible-lint
+
+      - name: shellcheck
+        run: shellcheck scripts/*.sh
+
+      - name: yamllint
+        run: yamllint services.yml ansible/
+
+      # Run from ansible/ so ansible.cfg applies — it is what points at
+      # inventory.ini and roles/, and without it --syntax-check parses an empty
+      # inventory and passes vacuously.
+      - name: ansible syntax
+        working-directory: ansible
+        run: ansible-playbook --syntax-check site.yml
+
+      # Compose validity is checked last because it needs the generated env,
+      # and the values do not matter — only that every interpolation resolves
+      # and the schema is valid. Placeholders, never real secrets.
+      - name: compose config is valid
+        run: |
+          set -a
+          # shellcheck disable=SC1091
+          . compose/generated/services.env
+          # Every remaining variable gets a dummy value: docker compose config
+          # fails on an unset interpolation, and that failure would be about
+          # CI's environment rather than about the file.
+          while read -r key; do
+            [ -n "$key" ] || continue
+            eval "${key}=\${${key}:-ci-placeholder}"
+          done < <(grep -oE '^[A-Z_][A-Z0-9_]*' env.example | sort -u)
+          set +a
+          docker compose -f compose/docker-compose.prod.yml config >/dev/null
+          echo "compose file is valid"

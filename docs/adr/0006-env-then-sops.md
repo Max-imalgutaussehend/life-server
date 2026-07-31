@@ -75,9 +75,21 @@ backup scope from M5. It is the one file that Git does not protect.
 - [x] M7: install SOPS+age, encrypt `.env` to `secrets.enc.env`, commit it
       — `.sops.yaml` declares the recipient; `make secrets-verify` proves the
       encrypted file round-trips to the live `.env`
-- [ ] M7: give GitHub Actions its own age key, not a copy of the operator's
-      — **blocked: the repository has no remote yet**
-- [x] M7: Phase 2 is active for the operator; the CI half is still pending
+- [x] M7: give GitHub Actions its own age key, not a copy of the operator's
+      — done 2026-07-30. CI's recipient is
+      `age1pzrzrjcmgg0srhu3q4g4553fxsm0yumlyg8tdh57tjvy28k3yy7qmavlsr`,
+      generated separately at `~/.config/sops/age/ci-key.txt`; both recipients
+      were verified to decrypt independently. Revoking CI is now a one-line
+      edit to `.sops.yaml` plus `sops updatekeys` — the operator's key is
+      untouched, which was the entire point of not sharing one.
+- [x] M7: Phase 2 is active for both recipients
+
+**The failure this guards against.** `.github/workflows/validate.yml` decrypts
+`secrets.enc.env` with CI's key on every push. Not because CI needs the values —
+it counts variables and discards them — but because the way this setup breaks is
+silent: someone re-encrypts without `sops updatekeys`, CI quietly stops being a
+recipient, and nobody finds out until a restore. A check that runs on every push
+turns a disaster-time discovery into a red build.
 
 **Phase 2 notes (2026-07-30).** Key names stay in plaintext inside
 `secrets.enc.env` and only values are encrypted, so a diff shows *which* secret
