@@ -1,0 +1,46 @@
+# =============================================================================
+# .yamllint.yml — lint rules for the YAML in this repository. (M7)
+# =============================================================================
+#
+# WHY THIS EXISTS
+#   yamllint's defaults are for YAML in general. This repository has a house
+#   style, and where the two disagree the house style is deliberate. Without
+#   this file CI fails on three lines that are all correct as written:
+#     - an inline comment explaining role ordering in site.yml
+#     - a copy-pasteable `ssh -i ... user@host` hint printed after a run
+#     - a Jinja architecture expression that cannot be wrapped
+#   Wrapping any of them to satisfy an 80-column default makes them worse.
+#
+#   The rules that catch real mistakes — broken indentation, duplicate keys,
+#   tabs, trailing whitespace, unparseable syntax — stay at error.
+# =============================================================================
+
+extends: default
+
+rules:
+  # 100, not unlimited. Long lines are usually worth questioning; these few are
+  # not, and a hard cap still catches genuinely runaway ones.
+  line-length:
+    max: 100
+    level: error
+
+  # Inline comments are aligned for readability in services.yml rather than
+  # padded to two spaces. Cosmetic either way, so this must not fail a build.
+  comments:
+    require-starting-space: true
+    min-spaces-from-content: 1
+
+  # services.yml opens with a comment block, not `---`. Harmless, and consistent
+  # across the repo.
+  document-start: disable
+
+  # A duplicate key silently discards one of the two values. In services.yml
+  # that means a service that looks declared and is not.
+  key-duplicates:
+    level: error
+
+  # GitHub Actions requires the literal key `on:`. yamllint reads it as the
+  # boolean `true` and objects — but the workflow cannot spell it any other way.
+  truthy:
+    allowed-values: ["true", "false", "on", "off"]
+    check-keys: false

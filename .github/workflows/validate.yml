@@ -88,7 +88,9 @@ jobs:
     runs-on: ubuntu-24.04
     # Forks cannot read repository secrets, so this job would fail for a reason
     # that says nothing about the code. Skip it there rather than fail loudly.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v4
 
@@ -143,11 +145,19 @@ jobs:
           sudo apt-get install -y -qq shellcheck
           pip install --quiet yamllint ansible ansible-lint
 
+      # --severity=warning: fail on bugs, not on style opinions. The four
+      # SC2001 hints this silences are `sed 's/^/  /'` indenting a MULTI-LINE
+      # string; the suggested ${var//search/replace} does not do per-line
+      # prefixing, so "fixing" them would make the code worse to satisfy a
+      # linter. Correctness checks (SC2086 word splitting, SC2164 unchecked cd,
+      # unset variables) are all warning-or-above and still fail the build.
       - name: shellcheck
-        run: shellcheck scripts/*.sh
+        run: shellcheck --severity=warning scripts/*.sh
 
+      # This workflow is included on purpose: CI's own config is YAML in this
+      # repository and gets no exemption from the rules it enforces.
       - name: yamllint
-        run: yamllint services.yml ansible/
+        run: yamllint services.yml ansible/ .github/
 
       # Run from ansible/ so ansible.cfg applies — it is what points at
       # inventory.ini and roles/, and without it --syntax-check parses an empty
