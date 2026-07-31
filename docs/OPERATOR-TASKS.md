@@ -115,15 +115,42 @@ backup, so these are lower stakes.
 
 ---
 
-## 3. 🟡 Subscribe your phone to alerts
+## 3. 🔴 Subscribe your phone to alerts — the last unproven link
+
+**Until this is done, monitoring detects outages and tells nobody.** Everything
+upstream is verified: Kuma detects, ntfy publishes, the Access bypass lets the
+push through. Delivery to the phone is the one hop never confirmed.
 
 Install the **ntfy** app (iOS/Android), then:
 
-1. Settings → *Add server* → `https://ntfy.maxrommel.de`
-2. Authentication: **Access token** → the value of `NTFY_PHONE_TOKEN` in `.env`
-3. Subscribe to the topic in `NTFY_TOPIC`
+1. Add server → `https://ntfy.maxrommel.de`
+2. **Settings → Users → Add user**, and enter **username + password**:
 
-Test with `make alert-test`. If nothing arrives, check task 1's bypass rule.
+   | Field | Value |
+   |---|---|
+   | Server | `https://ntfy.maxrommel.de` |
+   | Username | `phone` |
+   | Password | `grep NTFY_PHONE_PASSWORD .env` |
+
+3. Subscribe to the topic in `NTFY_TOPIC` (`grep NTFY_TOPIC .env`)
+
+**Why a password and not the token:** the mobile app's "Add user" screen accepts
+only username/password in some versions — observed 2026-07-31. So a dedicated
+`phone` account exists alongside `NTFY_PHONE_TOKEN`; either works, use whichever
+the app offers.
+
+**Credentials are not optional.** Verified: an anonymous poll returns **403**,
+the same request authenticated returns **200**. The Cloudflare bypass opens the
+network path; ntfy's own `deny-all` still demands credentials. That is the
+layering working as designed.
+
+**Do not use the `max` admin account on the phone.** `phone` is granted
+`read-only` on the topic (verified: read 200, publish 403). The admin account is
+read-write, so a stolen phone could publish a forged "all clear" — the one
+message that has to be trustworthy.
+
+Test with `make alert-test`. Messages are retained until they expire, so
+anything sent before you subscribe should appear once you do.
 
 ---
 
@@ -163,17 +190,25 @@ Per ADR-0007 the server pulls; CI holds no SSH key and cannot reach the host.
 
 ---
 
-## 6. 🟢 M8.5: close port 22
+## 6. 🟡 M8.5: close port 22 — decided, needs you to activate
 
-**Tailscale is ruled out** (your work laptop prohibits it), so ADR-0013's
-mechanism needs replacing. Recommended: **Cloudflare Access SSH** — browser-based,
-no client software, works from the work laptop, and reaches the same end state of
-zero public inbound ports.
+[ADR-0016](adr/0016-ssh-via-cloudflare-access.md) is written and supersedes
+ADR-0013: **Cloudflare Access SSH** instead of Tailscale, since your work laptop
+prohibits it. Same end state, no new inbound port, no new third party — the
+tunnel already carries everything else.
 
-Port 22 currently absorbs ~1000 automated attempts a day (key-only, rate-limited,
-fail2ban has banned 95 IPs). Not urgent, but it is the last public port.
+**Full steps are in [`docs/milestones/M8.5.md`](milestones/M8.5.md).** Two
+dashboard changes (~4 min), an `~/.ssh/config` stanza, then verify and close.
 
-Say the word and I will write the superseding ADR and implement it.
+**Why I did not do it for you:** closing the only working access path requires
+the console fallback to be real, and the console needs the Hetzner root
+password — which is not in `.env`, not in the repo, and not something I can
+confirm is in Bitwarden. Closing on an unverified fallback is the exact failure
+ADR-0013 was written to prevent.
+
+Port 22 stays `ufw limit`, key-only, fail2ban-guarded — the posture that has
+held since M1 against ~1000 attempts a day. Not urgent, but it is the last
+public port.
 
 ---
 

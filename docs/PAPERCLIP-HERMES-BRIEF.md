@@ -53,42 +53,77 @@ done.
 
 So the **platform** is ready. What is missing is the application itself.
 
-## Open questions that change the design materially
+## Answered 2026-07-31
 
-These need answers before code, because guessing wrong is expensive:
+> "all agents need to use claude login, no api. if not possible with hermes then
+> just claude code & paperclip, but they should be able to do execute code and
+> everything, tickes is done by paperclip the framework (i only have my claude
+> subscription, nothing else)"
 
-1. **Ticket store — Postgres or an existing tool?** A `tickets` table in the
-   `hermes` database is simplest and fully under our control. Alternatively n8n
-   or a real issue tracker. Recommendation: Postgres, because agents need
-   transactional state, not a UI.
+**1. Auth: Claude subscription only. No API key.** This is the binding
+constraint and it decides the architecture.
 
-2. **Where does agent execution happen?** A Hermes instance calling the Anthropic
-   API is cheap and stateless. One that *runs code* needs a sandbox, and that is
-   a serious security boundary on a host that also holds your credentials.
-   Which is it?
+A subscription authenticates **Claude Code** through an interactive OAuth login.
+It is not a credential a daemon can present on a server to call the Anthropic
+API programmatically. So "Hermes as a long-running service that calls the API in
+a loop" is not buildable under this constraint — not disallowed by taste, simply
+without a mechanism.
 
-3. **The Anthropic API key** — a new secret class. It is spendable, so it needs a
-   budget limit and, ideally, its own key per agent so one runaway loop is
-   attributable and revocable.
+The operator already accepted the consequence: *"if not possible with hermes then
+just claude code & paperclip"*.
 
-4. **What is the "work agent" and how does it connect?** Inbound webhook,
-   outbound polling, or shared queue? This determines whether anything new has to
-   be publicly reachable.
+**2. The runtime is therefore Claude Code itself.** It runs headless (`claude -p`),
+authenticates with the subscription, and already has tool use, file editing and
+code execution. Paperclip invokes Claude Code sessions rather than reimplementing
+an agent loop against an API that cannot be reached.
 
-5. **Does Paperclip execute code the operator writes?** If yes, it is effectively
-   remote code execution behind a login, and it belongs in its own isolation
-   boundary — not on the same Docker host as Postgres, or at minimum not on the
-   `data` network.
+**3. Tickets belong to Paperclip**, as the framework — not a separate Hermes
+service. Postgres remains the store (the `paperclip` database and role were
+provisioned in M4), but the schema and lifecycle are Paperclip's.
 
-6. **Build order.** My recommendation: ticket schema first, then one Hermes that
-   can only read/write tickets, then delegation, then Paperclip's UI. That way
-   there is something testable at every step, and the agent layer is proven
-   before a UI hides it.
+**4. Agents execute code — "everything".** Accepted as a requirement, and it is
+the single most consequential answer here. See the boundary below.
 
-## Recommended next step
+## The security boundary this forces
 
-Answer questions 1–3 (store, execution model, API key handling). That is enough
-to design the ticket schema and a first Hermes that does real work without any
-code-execution risk. Paperclip's UI can follow once the agent layer is proven.
+An agent that executes arbitrary code, driven by a model, on the host that also
+holds Postgres, `.env`, the age key and the backup repository, means **any prompt
+that reaches it can read every secret the system has.** Not a hypothetical: it is
+the plain consequence of code execution plus co-location.
 
-Until then M9 stays blocked, deliberately.
+So M9 gets a real boundary, not a Docker network label:
+
+| Rule | Reason |
+|---|---|
+| Agent workspaces run as a **non-root user in their own container**, one per session | a compromised session is not a compromised host |
+| That container joins **neither `data` nor `edge`** | no route to Postgres, Redis or the tunnel |
+| **No bind mount** of the repository, `.env`, `~/.config/sops`, or the Docker socket | the socket in particular is root on the host, trivially |
+| Database access, if ever needed, goes through an **explicit API on the `apps` network** — never a direct connection string | the agent gets an interface, not credentials |
+| Egress is allowed (Claude Code needs it) but the workspace holds **no long-lived secret** worth exfiltrating | limits the blast radius of what egress can carry out |
+
+**The unresolved piece:** Claude Code's OAuth session lives on the machine where
+the login happened. Running it inside a throwaway container means either mounting
+that credential in (which contradicts the table above) or logging in per session
+(which is interactive, and defeats automation). This is the first thing M9 has to
+solve, and it is a design question, not an implementation detail.
+
+## Still open
+
+- **The "work agent"** — what it is, and whether it connects inbound (webhook),
+  outbound (polling), or via a shared queue. Determines whether anything new must
+  be publicly reachable. Nothing is built for it until answered.
+- **Concurrency and cost** — how many agent sessions may run at once. A
+  subscription has rate limits, and an unbounded delegation tree will find them.
+
+## Build order
+
+1. Ticket schema in the `paperclip` database — testable with `psql`, no agents.
+2. The sandbox container and its constraints — provable by *trying* to reach
+   Postgres from inside it and failing.
+3. Paperclip invoking one Claude Code session against one ticket.
+4. Delegation (a session that creates tickets for other sessions).
+5. The web UI last.
+
+Each step is verifiable before the next hides it. Step 2 comes before any agent
+runs, because retrofitting an isolation boundary under a running system is how
+boundaries end up with holes.

@@ -17,6 +17,19 @@
 #   routing. Cloudflare handles TLS and Access; Caddy handles paths, headers
 #   and anything Cloudflare cannot express.
 #
+# ⚠️ THIS FILE IS NOT CURRENTLY MOUNTED INTO THE CONTAINER (verified 2026-07-31)
+#   The tunnel runs token-managed (`TUNNEL_TOKEN` in docker-compose.prod.yml),
+#   so cloudflared fetches its ingress rules from the Cloudflare dashboard and
+#   never reads this file. It is generated as the committed, reviewable record
+#   of what the routing SHOULD be, and as the drop-in config if the tunnel is
+#   ever switched to credentials-file mode.
+#
+#   Consequence, and the reason this warning exists: editing this file changes
+#   NOTHING at runtime. Adding an ingress rule here — for SSH, or anything else
+#   — produces a convincing-looking config that no process reads. Route changes
+#   must be made in the dashboard, or the tunnel must be migrated off
+#   TUNNEL_TOKEN first.
+#
 # ACCESS POLICIES ARE NOT DEFINED HERE
 #   Cloudflare Access rules live in the Zero Trust dashboard, not in this file
 #   (the tunnel config cannot express them). The `access:` field in

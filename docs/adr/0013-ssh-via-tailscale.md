@@ -1,8 +1,12 @@
 # ADR-0013: SSH stays open until Tailscale is proven, then closes
 
-- **Status:** Accepted
+- **Status:** ⚠️ **Superseded by [ADR-0016](0016-ssh-via-cloudflare-access.md)**
+  (2026-07-31) — the operator's work laptop prohibits Tailscale, so the
+  mechanism is unavailable. The **goal** below (zero public inbound ports), the
+  Phase 1 hardening, the verification discipline and the console fallback all
+  carry over unchanged; only the transport changed.
 - **Date:** 2026-07-28
-- **Milestone:** M0 (decision), M1 (hardening), M8.5 (Tailscale, close port 22)
+- **Milestone:** M0 (decision), M1 (hardening), M8.5 (superseded before Phase 2)
 
 ## Context
 
