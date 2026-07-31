@@ -99,7 +99,18 @@ accepted it, not that it was delivered.
 
 ---
 
-## 2. 🟡 Store three things in your password manager
+## 2. ✅ Password manager — done 2026-07-31
+
+Entered in Bitwarden by the operator. The plaintext copy on the Desktop
+(`life-server-secrets-BITWARDEN-DANN-LOESCHEN.txt`) was overwritten and deleted
+the same day, after verifying that both irreplaceable secrets are still
+recoverable: the age key decrypts `secrets.enc.env` from
+`~/.config/sops/age/keys.txt`, and `RESTIC_PASSWORD` is present in `.env` and in
+the committed encrypted file.
+
+Kept below as the reference for what must never be lost.
+
+### The three that cannot be recovered
 
 None of these can be recovered if lost:
 
@@ -115,11 +126,14 @@ backup, so these are lower stakes.
 
 ---
 
-## 3. 🔴 Subscribe your phone to alerts — the last unproven link
+## 3. ✅ Phone alerts — done 2026-07-31, delivery confirmed
 
-**Until this is done, monitoring detects outages and tells nobody.** Everything
-upstream is verified: Kuma detects, ntfy publishes, the Access bypass lets the
-push through. Delivery to the phone is the one hop never confirmed.
+The operator received two test notifications on the phone. **The monitoring
+chain is now proven end to end**: Kuma detects → ntfy publishes → the Cloudflare
+bypass passes it → the phone receives it. That was the last unverified hop, and
+the one that would otherwise have failed silently during a real outage.
+
+Kept below as the setup reference for a new device.
 
 Install the **ntfy** app (iOS/Android), then:
 

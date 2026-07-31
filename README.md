@@ -147,7 +147,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M7 | Deployment | ✅ SOPS, CI with its own age key, `validate` workflow green on every push |
 | M8 | Monitoring | ✅ Uptime Kuma + ntfy — outage → alert verified ([M8](docs/milestones/M8.md)) |
 | M8.5 | Remote access | 🔶 designed — [ADR-0016](docs/adr/0016-ssh-via-cloudflare-access.md) replaces Tailscale with Access SSH. Port 22 still open pending operator verification ([M8.5](docs/milestones/M8.5.md)) |
-| M9 | Applications | 🔶 specified — Claude Code as the runtime, sandbox required ([brief](docs/PAPERCLIP-HERMES-BRIEF.md)) |
+| M9 | Applications | 🔶 steps 1–2 of 5 — ticket schema live, agent sandbox proven 15/15 ([M9](docs/milestones/M9.md)) |
 
 ## Requirements
 

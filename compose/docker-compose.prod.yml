@@ -33,6 +33,24 @@ networks:
     name: ${ENV_PREFIX_NAME:-prod-}net-data
     internal: true
 
+  # ── agent — where code-executing agent sessions run (M9, step 2) ──────────
+  # A FOURTH network, deliberately not a reuse of `apps`.
+  #
+  # M9 agents execute arbitrary code driven by a model. Anything on `apps` can
+  # open a socket to anything else on `apps`, so putting agents there would let
+  # a prompt-injected session talk to n8n — which holds credentials for every
+  # service it integrates with. `data` would be worse still: direct Postgres.
+  #
+  # Sessions therefore get their own segment. A container here can reach only
+  # other containers explicitly placed here. It cannot see Postgres, Redis,
+  # n8n, Caddy or the tunnel.
+  #
+  # NOT internal: true — Claude Code must reach api.anthropic.com. That is the
+  # accepted asymmetry: egress is allowed, so the mitigation is that no
+  # long-lived secret is ever present in the workspace to exfiltrate.
+  agent:
+    name: ${ENV_PREFIX_NAME:-prod-}net-agent
+
 services:
 
   # ── Cloudflare Tunnel ─────────────────────────────────────────────────────

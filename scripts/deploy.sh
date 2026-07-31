@@ -55,9 +55,19 @@ fi
 echo "==> starting stack"
 # --env-file twice: .env holds secrets, services.env holds generated hostnames
 # and ports (ADR-0014). Compose merges them; later files win.
+#
+# net-agent is created explicitly because Compose only creates networks that a
+# service actually joins, and M9 agent workspaces are started per session by
+# `docker run`, not declared as services here. Without this the network exists
+# only if someone remembered to create it by hand — and `verify-agent-sandbox`
+# would fail for a reason that has nothing to do with the boundary it tests.
 ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" "
 	set -euo pipefail
 	cd $REMOTE_DIR
+	AGENT_NET=\"\$(grep -E '^ENV_PREFIX_NAME=' .env 2>/dev/null | cut -d= -f2-)\"
+	AGENT_NET=\"\${AGENT_NET:-prod-}net-agent\"
+	docker network inspect \"\$AGENT_NET\" >/dev/null 2>&1 \
+		|| docker network create \"\$AGENT_NET\" >/dev/null
 	docker compose \
 		--env-file .env \
 		--env-file compose/generated/services.env \

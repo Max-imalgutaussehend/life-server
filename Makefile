@@ -160,6 +160,12 @@ verify-data: ## [M4] Prove per-service DB isolation and Redis auth on the server
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
 		'bash /opt/life-server/scripts/verify-data-layer.sh'
 
+.PHONY: verify-agent-sandbox
+verify-agent-sandbox: ## [M9] Prove agent sessions cannot reach the data layer
+	@./scripts/deploy.sh --sync-only >/dev/null
+	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
+		'ENV_PREFIX_NAME=$(ENV_PREFIX_NAME) bash /opt/life-server/scripts/verify-agent-sandbox.sh'
+
 .PHONY: migrate
 migrate: ## [M9] Apply SQL migrations (DB=paperclip, MODE=--status|--dry-run)
 	@test -n "$(DB)" || { echo "$(ERR)DB= is required, e.g. make migrate DB=paperclip$(OFF)"; exit 1; }
