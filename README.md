@@ -9,9 +9,10 @@ Docker, everything reproducible from this repository.
 > and secrets encrypted in Git with CI enforcing the repository's invariants.
 > See [`docs/milestones/`](docs/milestones/) for each milestone.
 >
-> ⚠️ **Action required:** three hostnames are internet-reachable behind only
-> their own logins. See **[`docs/OPERATOR-TASKS.md`](docs/OPERATOR-TASKS.md)** —
-> task 1 needs the Cloudflare dashboard.
+> Every private hostname sits behind Cloudflare Access as of 2026-07-31. The one
+> deliberate exception is the ntfy topic path, which the phone app needs and
+> which ntfy's own `deny-all` still protects. Remaining work is in
+> **[`docs/OPERATOR-TASKS.md`](docs/OPERATOR-TASKS.md)**.
 
 ## Quick start
 

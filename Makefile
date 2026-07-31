@@ -31,6 +31,16 @@ SSH_KEY   ?= ~/.ssh/life-server
 SERVER_IP ?= 62.238.4.64
 ANSIBLE   := ansible-playbook -i ansible/inventory.ini
 
+# The age key is passed EXPLICITLY rather than relying on sops finding it.
+# Observed 2026-07-31: this sops build does not search
+# ~/.config/sops/age/keys.txt by default — its error lists SOPS_AGE_KEY_FILE
+# and friends but never the default path. Bare `sops` therefore failed with
+# "identity did not match any of the recipients", which reads exactly like a
+# lost or wrong key and is not one. Being explicit removes that guesswork from
+# the one workflow you run while something is already going badly.
+AGE_KEY_FILE ?= $(HOME)/.config/sops/age/keys.txt
+SOPS         := SOPS_AGE_KEY_FILE=$(AGE_KEY_FILE) sops
+
 # Colours for readable output, disabled when not a TTY (CI, pipes).
 ifneq (,$(findstring xterm,$(TERM)))
 	BOLD := $(shell tput bold)
@@ -168,27 +178,41 @@ secrets-encrypt: ## [M7] Encrypt .env -> secrets.enc.env (commit the result)
 	@command -v sops >/dev/null || { echo "$(ERR)sops missing: brew install sops age$(OFF)"; exit 1; }
 	@test -f .env || { echo "$(ERR).env missing. Run: make setup$(OFF)"; exit 1; }
 	@cp .env secrets.enc.env
-	@sops --encrypt --in-place secrets.enc.env
+	@$(SOPS) --encrypt --in-place secrets.enc.env \
+		|| { rm -f secrets.enc.env; echo "$(ERR)encryption failed — secrets.enc.env removed rather than left as PLAINTEXT$(OFF)"; exit 1; }
+	@grep -qE '^[A-Z_][A-Z0-9_]*=ENC\[' secrets.enc.env \
+		|| { rm -f secrets.enc.env; echo "$(ERR)result was not encrypted — removed$(OFF)"; exit 1; }
 	@echo "$(OK)secrets.enc.env written — commit it$(OFF)"
 
 .PHONY: secrets-decrypt
+# Decrypts to a temporary file FIRST. `sops --decrypt > .env` has the shell
+# truncate .env before sops even runs, so a failed decrypt destroys the live
+# secrets and leaves an empty file behind — during a restore, which is the only
+# situation in which this target is ever run.
 secrets-decrypt: ## [M7] Rebuild .env from secrets.enc.env (needs the age key)
 	@command -v sops >/dev/null || { echo "$(ERR)sops missing: brew install sops age$(OFF)"; exit 1; }
 	@test -f secrets.enc.env || { echo "$(ERR)secrets.enc.env missing$(OFF)"; exit 1; }
 	@test ! -f .env || cp .env .env.before-decrypt
-	@sops --decrypt secrets.enc.env > .env
+	@umask 077 && $(SOPS) --decrypt secrets.enc.env > .env.decrypt-tmp \
+		|| { rm -f .env.decrypt-tmp; echo "$(ERR)decrypt failed — .env untouched. Is $(AGE_KEY_FILE) present?$(OFF)"; exit 1; }
+	@test -s .env.decrypt-tmp \
+		|| { rm -f .env.decrypt-tmp; echo "$(ERR)decrypt produced an empty file — .env untouched$(OFF)"; exit 1; }
+	@mv .env.decrypt-tmp .env
 	@chmod 600 .env
 	@echo "$(OK).env restored (previous copy: .env.before-decrypt)$(OFF)"
 
 .PHONY: secrets-edit
 secrets-edit: ## [M7] Edit secrets in place, encrypted at rest
-	@sops secrets.enc.env
+	@$(SOPS) secrets.enc.env
 
 .PHONY: secrets-verify
+# 2>&1 rather than 2>/dev/null: sops explains exactly why it failed, and hiding
+# that turns a five-second fix into an investigation. umask 077 because the
+# verify file holds every secret in plaintext for as long as it exists.
 secrets-verify: ## [M7] Prove secrets.enc.env round-trips to the live .env
 	@command -v sops >/dev/null || { echo "$(ERR)sops missing$(OFF)"; exit 1; }
-	@sops --decrypt secrets.enc.env > /tmp/.sops-verify 2>/dev/null \
-		|| { echo "$(ERR)cannot decrypt — is the age key present?$(OFF)"; exit 1; }
+	@umask 077 && $(SOPS) --decrypt secrets.enc.env > /tmp/.sops-verify \
+		|| { rm -f /tmp/.sops-verify; echo "$(ERR)cannot decrypt — see the sops error above. Key: $(AGE_KEY_FILE)$(OFF)"; exit 1; }
 	@if diff <(grep -E '^[A-Z_]+=' .env | sort) \
 		<(grep -E '^[A-Z_]+=' /tmp/.sops-verify | sort) >/dev/null; then \
 		echo "$(OK)all $$(grep -cE '^[A-Z_]+=' .env) secrets match$(OFF)"; \

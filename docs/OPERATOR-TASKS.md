@@ -7,9 +7,13 @@ Ordered by urgency. **Task 1 is a live security gap** — the rest can wait.
 
 ---
 
-## 1. 🔴 Access policies for three hostnames — do this first
+## 1. ✅ Access policies — done 2026-07-31
 
-**Why it matters:** `n8n`, `status` and `ntfy` are reachable from the internet
+All three hostnames are gated; the ntfy topic path is deliberately not.
+Verified by redirect target, and a test alert was delivered to the phone.
+Kept here as the record of what was built and why.
+
+**Why it mattered:** `n8n`, `status` and `ntfy` were reachable from the internet
 right now. Each sits behind its own login, and each of those logins is
 rate-limited with a long generated password — so this is not an open door. But it
 is a *single* layer, and a single layer means any future CVE in any of those three
@@ -23,44 +27,75 @@ reaches the application at all.
 Cloudflare Zero Trust → **Access** → **Applications** → *Add an application* →
 **Self-hosted**, then for each:
 
-| Application name | Domain | Session |
+| Application name | Destination | Session |
 |---|---|---|
 | n8n | `n8n.maxrommel.de` | 24 hours |
 | status | `status.maxrommel.de` | 24 hours |
-| ntfy | `ntfy.maxrommel.de` | 30 days |
+| ntfy-push | `ntfy.maxrommel.de/<NTFY_TOPIC>` | 24 hours (Bypass — irrelevant) |
+| ntfy-web | `ntfy.maxrommel.de` | 30 days |
+
+Four applications, not three — see the ntfy exception below.
 
 Policy for each — identical:
 
 - Action: **Allow**
 - Rule: *Emails* → `max.rml@web.de`
 
-### ⚠️ One exception: ntfy needs a bypass path
+### ⚠️ One exception: ntfy needs TWO applications
 
 The ntfy **phone app is not a browser** and cannot complete an Access login. If
 you gate `ntfy.maxrommel.de` entirely, push notifications stop arriving.
 
-In the ntfy application, add a **second policy, ordered above the Allow policy**:
+The path lives on the **destination**, not on the policy, so a single
+application cannot express "bypass this one path, gate everything else". It
+takes two applications. Cloudflare matches the more specific path first:
 
-- Action: **Bypass**
-- Rule: *Everyone*
-- Path: `/<your topic>` — the value of `NTFY_TOPIC` in `.env`
-  (get it with `grep NTFY_TOPIC .env`)
+| Application | Destination | Policy |
+|---|---|---|
+| `ntfy-push` | `ntfy.maxrommel.de/<NTFY_TOPIC>` | Bypass → Everyone |
+| `ntfy-web` | `ntfy.maxrommel.de` (path empty) | Allow → Emails → your address |
 
-The topic itself stays protected by ntfy's own `deny-all` plus your token, so a
-bypass on that single path is not an open endpoint. The web UI stays gated.
+Get the topic with `grep NTFY_TOPIC .env`.
+
+**Do not put an Allow policy on `ntfy-push`** — the Bypass above it already
+matches everything that app covers, so the Allow is dead weight that suggests a
+protection which is not there.
+
+**Do not save a Bypass whose destination has no path.** That bypasses the entire
+hostname, which is worse than having no application at all: the dashboard shows
+a protected app while nothing is protected.
+
+The topic stays protected by ntfy's own `deny-all` plus your token, and the topic
+string is 40 random characters, so an open path is not an open endpoint.
 
 ### Verify — do not skip
 
+**A 302 alone proves nothing.** Uptime Kuma redirects `/` to `/dashboard` on its
+own, so an unprotected `status` returns 302 exactly like a protected one does.
+This was observed on 2026-07-31 while only the n8n policy existed. Check the
+redirect *target*, not the status code:
+
 ```bash
-# All three must return 302 (redirect to the Cloudflare login):
-for h in n8n status ntfy; do
-  printf '%-8s ' "$h"
-  curl -s -o /dev/null -w '%{http_code}\n' "https://$h.maxrommel.de/"
-done
+TOPIC=$(grep NTFY_TOPIC .env | cut -d= -f2)
+check() {
+  loc=$(curl -s -o /dev/null -D - --max-time 15 "$1" | grep -i '^location:')
+  case "$loc" in
+    *cloudflareaccess.com*) echo "GATED    $2" ;;
+    *)                      echo "NOT GATED  $2" ;;
+  esac
+}
+check "https://n8n.maxrommel.de/"        "n8n"
+check "https://status.maxrommel.de/"     "status"
+check "https://ntfy.maxrommel.de/"       "ntfy web UI"
+check "https://ntfy.maxrommel.de/$TOPIC" "ntfy topic — MUST be NOT GATED"
 ```
 
-A `200` means the policy did not attach — check the hostname spelling in the
-dashboard. Then confirm your phone still receives alerts: `make alert-test`.
+The first three must be `GATED`. The fourth must **not** be — that is the phone's
+push path, and gating it silently stops all alerts.
+
+Then prove delivery end to end: `make alert-test`, and confirm the notification
+actually arrives on the phone. The server returning a message id only proves ntfy
+accepted it, not that it was delivered.
 
 ---
 
