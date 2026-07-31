@@ -115,6 +115,32 @@ solve, and it is a design question, not an implementation detail.
 - **Concurrency and cost** — how many agent sessions may run at once. A
   subscription has rate limits, and an unbounded delegation tree will find them.
 
+## Resolved 2026-07-31 (second round)
+
+> "just do what you would recommend, do not think about the working agent, just
+> get the setup with the paperclip claude code ceo agent, finish everything"
+> — and, separately: "around 3 at once"
+
+Both questions above are now closed:
+
+- **The work agent is out of scope.** Nothing built, no hostname reserved.
+- **Concurrency is 3**, enforced by the runner.
+
+Two further decisions followed:
+
+- **Hermes as a separate service is dropped.** The CEO is a Claude Code session
+  with a role prompt, not a daemon. A `hermes` container would have had nothing
+  to run.
+- **Execution moved to the Mac** ([ADR-0017](adr/0017-agents-run-on-the-operator-machine.md)),
+  because Claude Code's OAuth credential is macOS-Keychain-bound and cannot be
+  copied to the VPS. This was the last blocking unknown, and it was settled by
+  checking rather than guessing: `security find-generic-password -s "Claude
+  Code-credentials"` returns it, while `~/.claude.json` holds only an account
+  reference.
+
+Steps 1–4 are built and proven end to end — see
+[`docs/milestones/M9.md`](milestones/M9.md).
+
 ## Build order
 
 1. Ticket schema in the `paperclip` database — testable with `psql`, no agents.

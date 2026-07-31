@@ -132,6 +132,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | [0009](docs/adr/0009-backups-before-stateful-services.md) | Backups ship before the first stateful service |
 | [0011](docs/adr/0011-pinned-image-versions.md) | Pinned image versions, never `latest` |
 | [0014](docs/adr/0014-service-registry.md) | `services.yml` is the single source of truth |
+| [0017](docs/adr/0017-agents-run-on-the-operator-machine.md) | Agent sessions run on the Mac; the server holds the tickets |
 
 ## Roadmap
 
@@ -147,7 +148,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M7 | Deployment | ✅ SOPS, CI with its own age key, `validate` workflow green on every push |
 | M8 | Monitoring | ✅ Uptime Kuma + ntfy — outage → alert verified ([M8](docs/milestones/M8.md)) |
 | M8.5 | Remote access | 🔶 designed — [ADR-0016](docs/adr/0016-ssh-via-cloudflare-access.md) replaces Tailscale with Access SSH. Port 22 still open pending operator verification ([M8.5](docs/milestones/M8.5.md)) |
-| M9 | Applications | 🔶 steps 1–2 of 5 — ticket schema live, agent sandbox proven 15/15 ([M9](docs/milestones/M9.md)) |
+| M9 | Applications | 🔶 steps 1–4 of 5 — CEO→worker agent loop working, 3 concurrent, only the web UI left ([M9](docs/milestones/M9.md)) |
 
 ## Requirements
 

@@ -168,6 +168,27 @@ verify-data: ## [M4] Prove per-service DB isolation and Redis auth on the server
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
 		'bash /opt/life-server/scripts/verify-data-layer.sh'
 
+# These run on THIS machine, not the server (ADR-0017). Claude Code's OAuth
+# credential is in the macOS Keychain and cannot be copied to the VPS, so
+# execution lives where the credential already is. The tickets stay on the
+# server, which is the durable, backed-up state.
+.PHONY: paperclip
+paperclip: ## [M9] Run the agent loop (Ctrl-C to stop)
+	@./scripts/paperclip-runner.sh
+
+.PHONY: paperclip-once
+paperclip-once: ## [M9] One pass of the agent loop, then exit
+	@./scripts/paperclip-runner.sh --once
+
+.PHONY: paperclip-status
+paperclip-status: ## [M9] Show the ticket queue
+	@./scripts/paperclip-runner.sh --status
+
+.PHONY: paperclip-add
+paperclip-add: ## [M9] Add a goal for the CEO agent (GOAL="...")
+	@test -n "$(GOAL)" || { echo "$(ERR)GOAL= is required, e.g. make paperclip-add GOAL=\"plan my week\"$(OFF)"; exit 1; }
+	@./scripts/paperclip-runner.sh --add "$(GOAL)"
+
 .PHONY: verify-agent-sandbox
 verify-agent-sandbox: ## [M9] Prove agent sessions cannot reach the data layer
 	@./scripts/deploy.sh --sync-only >/dev/null
