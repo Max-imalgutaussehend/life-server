@@ -1,9 +1,20 @@
 # Operator tasks — what only you can do
 
 Everything buildable has been built. What remains needs either the Cloudflare
-dashboard, a GitHub account, or a decision that is yours to make.
+dashboard or a decision that is yours to make.
 
-Ordered by urgency. **Task 1 is a live security gap** — the rest can wait.
+**Updated 2026-07-31 — there is no longer a live security gap.** Tasks 1–3 and 5
+are done: all private hostnames are behind Cloudflare Access, secrets are in
+Bitwarden and the plaintext Desktop copy is destroyed, phone alerts are
+confirmed delivered end to end, and CI is green.
+
+What is left, in order:
+
+| | Task | Needs |
+|---|---|---|
+| 6 | Close port 22 | ~10 min, dashboard + a cold reconnect test |
+| 7 | M9 questions | two answers, no work |
+| 4 | Automate off-host backups | a decision (B2 credentials) |
 
 ---
 
@@ -226,13 +237,31 @@ public port.
 
 ---
 
-## 7. 🟢 M9: Paperclip and Hermes
+## 7. 🟢 M9: Paperclip — steps 1–2 built, 2 questions left
 
-**Blocked on:** these do not exist yet. `services.yml` reserves their hostnames,
-and M4 already provisioned their databases, roles and credentials — but there is
-no application code, and I should not invent what they do.
+Unblocked by your answers on 2026-07-31. Because you have a Claude subscription
+and no API key, **Claude Code itself is the agent runtime** — a subscription
+authenticates interactively and is not a credential a server daemon can present
+to the API. Hermes as a long-running API client is therefore not buildable;
+Paperclip owns the tickets and invokes Claude Code sessions.
 
-Tell me what either service should be and it becomes a normal build.
+Done and verified: the ticket schema, and the agent sandbox (15/15, plus a
+negative control proving the test can actually fail). See
+[`docs/milestones/M9.md`](milestones/M9.md).
+
+**Two answers would unblock the rest:**
+
+1. **The "work agent"** — what is it, and how should it connect? Inbound
+   webhook, outbound polling, or a shared queue? This decides whether anything
+   new has to be publicly reachable, so I will not guess it.
+2. **Concurrency** — how many agent sessions may run at once? A subscription has
+   rate limits and an unbounded delegation tree will find them.
+
+**One design problem I cannot solve alone:** Claude Code's OAuth session lives
+on the machine where the login happened. Running sessions in throwaway
+containers means either mounting that credential in — which contradicts the
+sandbox that makes code execution safe — or logging in per session, which is
+interactive and defeats automation. This needs a decision before step 3.
 
 ---
 

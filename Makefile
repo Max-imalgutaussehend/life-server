@@ -93,20 +93,28 @@ check: ## Verify generated files are current and .env is complete
 check-env: ## Verify .env matches env.example
 	@./scripts/setup-env.sh --check
 
+# --severity=warning MUST match .github/workflows/validate.yml. Two different
+# standards is worse than either one: a local run that passes and a CI run that
+# fails teaches you to ignore the local run. The suppressed findings are SC2001
+# style hints about `sed 's/^/  /'` indenting multi-line strings, where the
+# suggested ${var//search/replace} does not do per-line prefixing.
+#
+# The other linters print a WARNING when absent rather than staying silent —
+# a skipped check that looks like a pass is how drift accumulates unnoticed.
 .PHONY: lint
 lint: ## Run all linters (shellcheck, yamllint, ansible-lint)
 	@echo "$(BOLD)==> shellcheck$(OFF)"
 	@if command -v shellcheck >/dev/null; then \
-		shellcheck scripts/*.sh && echo "$(OK)  ok$(OFF)"; \
-	else echo "$(DIM)  skipped (brew install shellcheck)$(OFF)"; fi
+		shellcheck --severity=warning scripts/*.sh && echo "$(OK)  ok$(OFF)"; \
+	else echo "$(WARN)  skipped — CI WILL still run it (brew install shellcheck)$(OFF)"; fi
 	@echo "$(BOLD)==> yamllint$(OFF)"
 	@if command -v yamllint >/dev/null; then \
-		yamllint services.yml ansible/ && echo "$(OK)  ok$(OFF)"; \
-	else echo "$(DIM)  skipped (brew install yamllint)$(OFF)"; fi
+		yamllint services.yml ansible/ .github/ && echo "$(OK)  ok$(OFF)"; \
+	else echo "$(WARN)  skipped — CI WILL still run it (pip install yamllint)$(OFF)"; fi
 	@echo "$(BOLD)==> ansible-lint$(OFF)"
 	@if command -v ansible-lint >/dev/null && test -f ansible/site.yml; then \
 		ansible-lint ansible/site.yml && echo "$(OK)  ok$(OFF)"; \
-	else echo "$(DIM)  skipped$(OFF)"; fi
+	else echo "$(WARN)  skipped — CI runs an ansible syntax check regardless$(OFF)"; fi
 
 # =============================================================================
 # Server tasks
