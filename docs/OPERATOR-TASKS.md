@@ -237,82 +237,114 @@ public port.
 
 ---
 
-## 7. 🟢 M9: Paperclip — steps 1–2 built, 2 questions left
+## 7. ✅ M9/M10 questions — resolved, tasks retired
 
-Unblocked by your answers on 2026-07-31. Because you have a Claude subscription
-and no API key, **Claude Code itself is the agent runtime** — a subscription
-authenticates interactively and is not a credential a server daemon can present
-to the API. Hermes as a long-running API client is therefore not buildable;
-Paperclip owns the tickets and invokes Claude Code sessions.
-
-Done and verified: the ticket schema, and the agent sandbox (15/15, plus a
-negative control proving the test can actually fail). See
-[`docs/milestones/M9.md`](milestones/M9.md).
-
-**Two answers would unblock the rest:**
-
-1. **The "work agent"** — what is it, and how should it connect? Inbound
-   webhook, outbound polling, or a shared queue? This decides whether anything
-   new has to be publicly reachable, so I will not guess it.
-2. **Concurrency** — how many agent sessions may run at once? A subscription has
-   rate limits and an unbounded delegation tree will find them.
-
-**One design problem I cannot solve alone:** Claude Code's OAuth session lives
-on the machine where the login happened. Running sessions in throwaway
-containers means either mounting that credential in — which contradicts the
-sandbox that makes code execution safe — or logging in per session, which is
-interactive and defeats automation. This needs a decision before step 3.
+Superseded by [ADR-0020](adr/0020-upstream-paperclip-and-subscription-proxy.md).
+The old tasks 7-9 asked about the "work agent", session concurrency, the
+Keychain credential problem, and which WhatsApp transport to use. All are
+answered: upstream Paperclip owns the board, `claude setup-token` plus
+CLIProxyAPI solves the credential, and WhatsApp is the QR-paired route via
+OpenClaw. See [M11](milestones/M11.md).
 
 ---
 
-## 8. 🔴 Publish the Paperclip UI — one Access application
+## 8. 🔴 M11: deploy the new stack — 4 steps need you
 
-**The UI is built, deployed and healthy, but its public route is deliberately
-switched off.**
+The code is committed and CI-clean. **The server is untouched** — it still runs
+the old Go UI, so nothing is down while these are pending.
 
-`services.yml` has `paperclip` at `enabled: false` with a comment explaining
-why: when it was briefly enabled without an Access policy,
-`paperclip.maxrommel.de` answered **200 to an unauthenticated request** — a
-public ticket queue containing whatever the agents know about work, uni and job
-search. Reverted within minutes.
+### 8a. Build the Paperclip image
 
-Create the application exactly like the others:
+Upstream ships no server image, and this host has too little free memory to
+build a pnpm monorepo safely. CI builds it instead.
 
-| Field | Value |
-|---|---|
-| Application name | `paperclip` |
-| Destination | Public hostname `paperclip` . `maxrommel.de`, path empty |
-| Session Duration | `24 hours` |
-| Policy | Allow → Include → **Emails** → `max.rml@web.de` |
+1. GitHub → Actions → **paperclip-image** → Run workflow → tag `v2026.722.0`.
+2. When it finishes, the run summary prints a line like:
+   `PAPERCLIP_IMAGE=ghcr.io/<you>/paperclip@sha256:...`
+3. Paste that into `.env` on the server.
 
-Then publish it:
+A **digest**, not a tag — a tag can be moved underneath you, which is the
+failure ADR-0011 exists to prevent.
+
+> If the GHCR package is private, the server needs `docker login ghcr.io` once
+> with a read:packages token, or the pull fails with `denied`.
+
+### 8b. Authenticate the subscription proxy
 
 ```bash
-# in services.yml set: enabled: true
-make generate && make deploy-stack
-curl -s -o /dev/null -D - https://paperclip.maxrommel.de/ | grep -i location
-# must point at cloudflareaccess.com
+make proxy-login          # interactive; opens a device-code flow
 ```
 
-Until then the UI still works — it is simply only reachable from inside the
-server's `apps` network.
+**Expect to repeat this roughly weekly.** The Claude OAuth credential expires
+in ~7 days. Uptime Kuma alerts before that bites (8c), but there is no headless
+way to renew it — this is the manual step the design accepts.
+
+### 8c. Wire the credential alarm
+
+```bash
+make seed-monitors        # creates the cliproxy PUSH monitor
+```
+
+Then open `status.maxrommel.de` → the `cliproxy` monitor → copy its **Push URL**
+into `KUMA_PUSH_URL` in `.env`, and `make deploy`.
+
+Until that variable is set the heartbeat container exits loudly rather than
+pretending to monitor. That is deliberate: the failure it catches is silent, so
+a silent monitoring gap would be the worst possible default.
+
+### 8d. Prove the sandbox still holds
+
+```bash
+make verify-agent-sandbox
+```
+
+**This must pass before any agent runs.** It now also asserts that the proxy
+rejects unauthenticated requests and that its management API is gone — an open
+proxy on that network lets a prompt-injected session spend your subscription,
+and spent quota has no undo.
 
 ---
 
-## 9. 🟡 Decide: how WhatsApp connects
+## 9. 🔴 WhatsApp: TWO Access applications, not one
 
-[ADR-0018](adr/0018-whatsapp-assistant.md) has the full reasoning. One choice:
+OpenClaw pairs with WhatsApp by QR and needs a **publicly reachable HTTPS
+callback**. Cloudflare Access gates browsers, not webhook callers — so a single
+Allow policy would silently break delivery, exactly as it would have for ntfy in
+M8.
 
-- **Meta WhatsApp Business Cloud API** (recommended) — official, free tier far
-  beyond personal use, ~15 minutes of dashboard setup, no risk to your account.
-- **An unofficial library** driving WhatsApp Web — no setup, but against
-  WhatsApp's terms, and your personal number can be banned.
+**The path lives on the DESTINATION, not on the policy.** That is why this takes
+two applications; putting a path on a Bypass policy scopes nothing and leaves
+the whole hostname open.
 
-**No second LLM is needed.** The CEO agent already turns a sentence into
-tickets, and a WhatsApp message is a sentence — the bridge is transport, not
-intelligence. Routing over free providers would send your job-search and work
-messages through whichever vendor had quota that hour, which is the one thing
-this system is built to avoid.
+| | App A — callback | App B — the UI |
+|---|---|---|
+| Name | `openclaw-hook` | `openclaw-web` |
+| Destination | `openclaw.maxrommel.de` **+ path** `/webhook` | `openclaw.maxrommel.de`, path empty |
+| Policy | **Bypass** → Everyone | **Allow** → Emails → `max.rml@web.de` |
+| Session | n/a | 24 hours |
+
+Order matters: create **A first**. With B alone, the callback is gated and
+pairing fails in a way that looks like WhatsApp being broken.
+
+### Verify by REDIRECT TARGET, never by status code
+
+```bash
+# The UI must bounce to Cloudflare Access:
+curl -s -o /dev/null -D - https://openclaw.maxrommel.de/ | grep -i location
+#   -> must contain cloudflareaccess.com
+
+# The callback must NOT be gated:
+curl -s -o /dev/null -w '%{http_code}\n' https://openclaw.maxrommel.de/webhook
+#   -> 200/404/405 are all fine. A cloudflareaccess.com redirect is NOT.
+```
+
+M8 proved why the status code alone lies: Uptime Kuma returned 302 because it
+redirects `/` to `/dashboard` itself, and passed a naive check while completely
+open.
+
+**Until both applications exist and verify, leave OpenClaw off the public
+route.** It runs shell commands; an ungated route to it is remote code
+execution.
 
 ---
 

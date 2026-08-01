@@ -132,7 +132,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | [0009](docs/adr/0009-backups-before-stateful-services.md) | Backups ship before the first stateful service |
 | [0011](docs/adr/0011-pinned-image-versions.md) | Pinned image versions, never `latest` |
 | [0014](docs/adr/0014-service-registry.md) | `services.yml` is the single source of truth |
-| [0017](docs/adr/0017-agents-run-on-the-operator-machine.md) | Agent sessions run on the Mac; the server holds the tickets |
+| [0020](docs/adr/0020-upstream-paperclip-and-subscription-proxy.md) | Upstream Paperclip; Hermes + OpenClaw on one subscription proxy (supersedes 0017/0018/0019) |
 
 ## Roadmap
 
@@ -148,8 +148,9 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M7 | Deployment | ✅ SOPS, CI with its own age key, `validate` workflow green on every push |
 | M8 | Monitoring | ✅ Uptime Kuma + ntfy — outage → alert verified ([M8](docs/milestones/M8.md)) |
 | M8.5 | Remote access | 🔶 designed — [ADR-0016](docs/adr/0016-ssh-via-cloudflare-access.md) replaces Tailscale with Access SSH. Port 22 still open pending operator verification ([M8.5](docs/milestones/M8.5.md)) |
-| M9 | Applications | ✅ agent loop + web UI ([M9](docs/milestones/M9.md)) — UI's public route pending its Access policy |
-| M10 | WhatsApp | ⛔ blocked — one decision, [ADR-0018](docs/adr/0018-whatsapp-assistant.md) |
+| M9 | Applications | ✅ agent loop + web UI ([M9](docs/milestones/M9.md)) — both replaced in M11 |
+| M10 | Agents on the server | ✅ superseded by M11 — `claude setup-token` proved ADR-0017 wrong |
+| M11 | Paperclip + agents | 🔶 built, not deployed — upstream Paperclip, Hermes CEO, OpenClaw on WhatsApp ([M11](docs/milestones/M11.md)) |
 
 ## Requirements
 
