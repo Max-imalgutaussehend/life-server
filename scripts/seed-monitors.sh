@@ -192,8 +192,13 @@ sock.on("connect", () => {
           // and pushToken is meaningless for an HTTP one. Kuma mints the token
           // itself when one is not supplied, which is what `make proxy-token`
           // then reads back.
+          // accepted_statuscodes is sent for BOTH types. It is meaningless for
+          // a push monitor, but Kuma calls .every() on it unconditionally
+          // while saving — omitting it fails with "Cannot read properties of
+          // undefined (reading every)", which names no field and is therefore
+          // very hard to place.
           isPush
-            ? {}
+            ? { accepted_statuscodes: ["200-299"] }
             : { url: m.url, method: "GET", accepted_statuscodes: ["200-299"] }
           ), (ares) => {
             if (!ares || !ares.ok) {
