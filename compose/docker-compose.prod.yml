@@ -647,9 +647,23 @@ services:
       OPENAI_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
       # Gates the gateway itself. Paperclip presents this as a bearer token on
       # the WebSocket connect frame.
-      OPENCLAW_GATEWAY_KEY: ${OPENCLAW_GATEWAY_KEY:?OPENCLAW_GATEWAY_KEY is not set in .env}
+      #
+      # Upstream's name is OPENCLAW_GATEWAY_TOKEN — verified against the gateway
+      # runbook, not guessed. `gateway.auth.token` is the config-file
+      # equivalent.
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_KEY:?OPENCLAW_GATEWAY_KEY is not set in .env}
+      # Port precedence upstream is --port -> OPENCLAW_GATEWAY_PORT ->
+      # gateway.port -> 18789. Pinned explicitly so the adapter URL below and
+      # the listener cannot drift apart.
+      OPENCLAW_GATEWAY_PORT: 18789
+      # The config file below is where the model provider is actually declared;
+      # the OPENAI_* vars above exist only because it references them as
+      # ${OPENAI_BASE_URL} / ${OPENAI_API_KEY}. Setting them without the file
+      # would configure nothing.
+      OPENCLAW_CONFIG_PATH: /config/openclaw.json
       TZ: ${TZ:-Europe/Berlin}
     volumes:
+      - ./openclaw/openclaw.json:/config/openclaw.json:ro
       # WhatsApp pairs by QR and persists a session. Losing this volume means
       # re-scanning the code from the phone, so it is a named volume, not a
       # bind mount into the ephemeral container filesystem.
