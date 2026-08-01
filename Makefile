@@ -168,26 +168,22 @@ verify-data: ## [M4] Prove per-service DB isolation and Redis auth on the server
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
 		'bash /opt/life-server/scripts/verify-data-layer.sh'
 
-# These run on THIS machine, not the server (ADR-0017). Claude Code's OAuth
-# credential is in the macOS Keychain and cannot be copied to the VPS, so
-# execution lives where the credential already is. The tickets stay on the
-# server, which is the durable, backed-up state.
-.PHONY: paperclip
-paperclip: ## [M9] Run the agent loop (Ctrl-C to stop)
-	@./scripts/paperclip-runner.sh
+# The M9 `paperclip*` targets are gone (M11). They drove the hand-written Go UI
+# from this machine over SSH+psql, which ADR-0017 required while Claude Code's
+# credential was believed to be Keychain-bound. Upstream Paperclip owns the
+# board now and the agents run on the server, so the loop is a container rather
+# than a Makefile target: see `make logs` and the board at paperclip.${DOMAIN}.
 
-.PHONY: paperclip-once
-paperclip-once: ## [M9] One pass of the agent loop, then exit
-	@./scripts/paperclip-runner.sh --once
-
-.PHONY: paperclip-status
-paperclip-status: ## [M9] Show the ticket queue
-	@./scripts/paperclip-runner.sh --status
-
-.PHONY: paperclip-add
-paperclip-add: ## [M9] Add a goal for the CEO agent (GOAL="...")
-	@test -n "$(GOAL)" || { echo "$(ERR)GOAL= is required, e.g. make paperclip-add GOAL=\"plan my week\"$(OFF)"; exit 1; }
-	@./scripts/paperclip-runner.sh --add "$(GOAL)"
+# The proxy holds the Claude OAuth credential, and minting it needs a browser —
+# the one thing a headless VPS cannot do. This runs the interactive login
+# against the container so the credential lands in the volume that persists it.
+#
+# EXPECT TO RUN THIS ROUGHLY WEEKLY: the credential expires in ~7 days
+# (ADR-0020). Uptime Kuma alerts before it does; this is the fix.
+.PHONY: proxy-login
+proxy-login: ## [M11] Authenticate the subscription proxy (needed ~weekly)
+	@ssh -t -i $(SSH_KEY) deploy@$(SERVER_IP) \
+		'docker exec -it $(ENV_PREFIX_NAME)cliproxy cli-proxy-api --login claude'
 
 .PHONY: verify-agent-sandbox
 verify-agent-sandbox: ## [M9] Prove agent sessions cannot reach the data layer

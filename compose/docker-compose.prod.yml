@@ -382,6 +382,16 @@ services:
       # apps only. Kuma checks services over HTTP through the apps network and
       # reaches ntfy the same way. It is deliberately NOT on data — a monitor
       # has no business being able to open a database socket (ADR-0004).
+      #
+      # AND DELIBERATELY NOT ON `agent`, even though M11 added a monitor for
+      # cliproxy which lives there. Joining a network is bidirectional: it
+      # would not just let Kuma poll the proxy, it would let every
+      # code-executing agent session reach Kuma — which holds the ntfy
+      # publish token, i.e. the ability to send YOU a forged all-clear. That
+      # inverts the one alert that has to stay trustworthy (see M8).
+      #
+      # The proxy is monitored from inside the agent segment instead, by
+      # Paperclip's own health endpoint. See scripts/seed-monitors.sh.
       - apps
     healthcheck:
       # curl, NOT wget: the Kuma 2.x image ships curl and has no wget, so a
@@ -567,6 +577,50 @@ services:
           memory: 256M
     security_opt:
       - no-new-privileges:true
+
+  # ── cliproxy-heartbeat — proves the credential still works ────────────────
+  # The monitor that matters most (M11, ADR-0020). Sends one real completion an
+  # hour and pushes the result to Uptime Kuma, so an expired Claude credential
+  # surfaces as an alert instead of a board that quietly stops moving.
+  #
+  # WHY A SEPARATE CONTAINER AND NOT A NETWORK CHANGE
+  #   Kuma is on `apps`, cliproxy on `agent`. Putting Kuma on `agent` would let
+  #   every code-executing agent session reach it — and Kuma holds the ntfy
+  #   publish token, i.e. the ability to send a forged all-clear (M8). This
+  #   sidecar bridges the two instead, and it is safe to do so precisely
+  #   because it runs a fixed 60-line shell script and never executes
+  #   model-chosen code. It is a courier, not an agent.
+  #
+  #   It is the ONLY container on both networks, and that is deliberate.
+  cliproxy-heartbeat:
+    image: alpine:3.21
+    container_name: ${ENV_PREFIX_NAME:-prod-}cliproxy-heartbeat
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/heartbeat.sh"]
+    environment:
+      PROXY_HOST: ${ENV_PREFIX_NAME:-prod-}cliproxy
+      PROXY_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      # Minted by Uptime Kuma when the `cliproxy` push monitor is created.
+      # Empty means the heartbeat exits loudly rather than pretending to work.
+      KUMA_PUSH_URL: ${KUMA_PUSH_URL:-}
+      HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-3600}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./cliproxy/heartbeat.sh:/heartbeat.sh:ro
+    networks:
+      - agent
+      - apps
+    depends_on:
+      cliproxy:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          # A shell loop calling wget once an hour.
+          memory: 32M
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
 
   # ── openclaw — the personal assistant ─────────────────────────────────────
   # Point of contact #1: the operator talks to this on WhatsApp, and it talks to

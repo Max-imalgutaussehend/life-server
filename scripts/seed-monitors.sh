@@ -70,7 +70,41 @@ const monitors = [
   { name: "caddy",  url: "http://" + process.env.PREFIX + "caddy:80/healthz" },
   { name: "n8n",    url: "http://" + process.env.PREFIX + "n8n:5678/healthz" },
   { name: "ntfy",   url: "http://" + process.env.PREFIX + "ntfy:80/v1/health" },
-  { name: "whoami", url: "http://" + process.env.PREFIX + "whoami:8000/" },
+
+  // The whoami monitor went with the service in M11. A monitor pointing at a
+  // container that no longer exists is not a harmless leftover: it alerts
+  // forever, and an alert you learn to ignore is worse than no alert.
+  //
+  // NOTE: no apostrophes anywhere in this block. The whole script body is one
+  // single-quoted node -e argument, so a stray apostrophe silently ends the
+  // string and the rest gets parsed as shell (shellcheck SC1011).
+
+  // M11. Reachable because Paperclip is on `apps` as well as `agent`.
+  { name: "paperclip", url: "http://" + process.env.PREFIX + "paperclip:3100/api/health" },
+
+  // ── THE MOST IMPORTANT MONITOR HERE (M11, ADR-0020) ──────────────────────
+  //
+  // A PUSH monitor, not an HTTP one, and that is the whole point.
+  //
+  // cliproxy lives on `agent`; Kuma lives on `apps`. Kuma could poll it only
+  // by joining `agent` — which would also let every code-executing agent
+  // session reach Kuma, and Kuma holds the ntfy PUBLISH token, i.e. the
+  // ability to send a forged all-clear. M8 established that the all-clear is
+  // the one message that must stay trustworthy. So the connection direction is
+  // inverted instead: the agent side reports OUT, and no network is widened.
+  //
+  // WHAT IT CATCHES: the Claude OAuth credential expires in ~7 days, and when
+  // it does every agent stops SILENTLY — indistinguishable from an empty
+  // queue. That is the M10 failure exactly, and it is the failure this system
+  // is most likely to actually hit.
+  //
+  // Unlike an HTTP check, the heartbeat is sent only after a REAL completion
+  // succeeds (see compose/cliproxy/heartbeat.sh), so it proves the credential
+  // still works — not merely that the process is up.
+  //
+  // 3900s ≈ 65 min against an hourly heartbeat: one missed report is tolerated
+  // (a restart), two is an alert.
+  { name: "cliproxy", type: "push", interval: 3900 },
 ];
 
 const fail = (m) => { console.error("  ERROR: " + m); process.exit(1); };
@@ -132,15 +166,20 @@ sock.on("connect", () => {
         let done = 0;
         let failures = 0;
         for (const m of todo) {
-          sock.emit("add", {
-            type: "http",
+          // A push monitor inverts the direction: Kuma waits to be told, and
+          // alerts when nobody tells it. That is what lets the proxy be
+          // watched from `agent` without Kuma joining that network.
+          //
+          // heartbeatInterval is deliberately long for the proxy — it reports
+          // hourly, and Kuma alerts if two reports are missed. Anything
+          // shorter would page on a restart.
+          const isPush = m.type === "push";
+          sock.emit("add", Object.assign({
+            type: isPush ? "push" : "http",
             name: m.name,
-            url: m.url,
-            method: "GET",
-            interval: 60,
-            retryInterval: 60,
-            maxretries: 2,
-            accepted_statuscodes: ["200-299"],
+            interval: m.interval || 60,
+            retryInterval: m.interval || 60,
+            maxretries: isPush ? 1 : 2,
             notificationIDList: notifId ? { [notifId]: true } : {},
             active: true,
             // Kuma 2.x added monitor.conditions as NOT NULL. Omitting it (or
@@ -148,7 +187,15 @@ sock.on("connect", () => {
             // error only surfaces in the callback — the socket itself looks
             // fine, which is why the first attempt appeared to "time out".
             conditions: [],
-          }, (ares) => {
+          },
+          // url/method/accepted_statuscodes are meaningless for a push monitor
+          // and pushToken is meaningless for an HTTP one. Kuma mints the token
+          // itself when one is not supplied, which is what `make proxy-token`
+          // then reads back.
+          isPush
+            ? {}
+            : { url: m.url, method: "GET", accepted_statuscodes: ["200-299"] }
+          ), (ares) => {
             if (!ares || !ares.ok) {
               // Report and keep going: one bad monitor should not silently
               // abort seeding the rest.

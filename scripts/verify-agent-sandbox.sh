@@ -91,6 +91,12 @@ EOF
 # two permitted holes in the wall, checked by 2b and 2c instead. Hermes and
 # openclaw are also on this network and are NOT probed: they are peers of the
 # agent sessions, not resources the sandbox protects.
+#
+# `status` IS probed here and MUST be unreachable, even though M11 added a
+# heartbeat sidecar that reaches Kuma from this network. That sidecar is on
+# both networks; agents are not, and the check below is what keeps that true.
+# If Kuma ever becomes reachable from here, an injected session can forge the
+# all-clear — see the note on cliproxy-heartbeat in the compose file.
 while read -r host port; do
 	[ -n "$host" ] || continue
 	if probe_tcp "$host" "$port"; then
