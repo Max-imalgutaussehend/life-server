@@ -46,7 +46,11 @@ if ! ls /data/auth/*.json >/dev/null 2>&1; then
 	# (SC3028), so interpolating it here would print an empty name in the one
 	# message whose whole job is to be copy-pasteable.
 	echo "warning: no Claude credential in /data/auth — the proxy will answer but cannot serve models." >&2
-	echo "         Run:  docker exec -it ${ENV_PREFIX_NAME:-prod-}cliproxy cli-proxy-api --login claude" >&2
+	echo "         Run:  make proxy-login" >&2
 fi
 
-exec /cli-proxy-api --config "$RENDERED" "$@"
+# /CLIProxyAPI/CLIProxyAPI, verified against the image — NOT /cli-proxy-api,
+# which is what the package is called and what I first guessed. Flags are
+# single-dash Go stdlib style (-config, not --config); `--config` is parsed as
+# a positional argument and the config is silently ignored.
+exec /CLIProxyAPI/CLIProxyAPI -config "$RENDERED" "$@"

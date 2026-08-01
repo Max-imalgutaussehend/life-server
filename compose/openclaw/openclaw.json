@@ -30,6 +30,14 @@
   },
 
   "gateway": {
+    "//": [
+      "mode is REQUIRED. Without it OpenClaw refuses to start with 'existing",
+      "config is missing gateway.mode. Treat this as suspicious or clobbered",
+      "config' — a deliberate guard against a half-written config, and a good",
+      "one. `local` means this process IS the gateway, which is what the",
+      "openclaw_gateway adapter connects to."
+    ],
+    "mode": "local",
     "auth": {
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
     },

@@ -482,6 +482,16 @@ services:
       PORT: 3100
       SERVE_UI: "true"
       PAPERCLIP_DEPLOYMENT_EXPOSURE: private
+      # Signs Paperclip's own session cookies and agent JWTs. Upstream refuses
+      # to start without it rather than defaulting to something guessable —
+      # correct, since a predictable signing key means forgeable sessions.
+      #
+      # This is the SECOND auth layer, behind Cloudflare Access. M9 argued a
+      # weak second layer is a liability; that reasoning does not apply here,
+      # because agents authenticate to Paperclip with issued API keys and the
+      # invite/join flow needs real accounts. Access gates the browser; this
+      # gates the API.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is not set in .env}
       TZ: ${TZ:-Europe/Berlin}
     networks:
       - apps
@@ -565,7 +575,16 @@ services:
     networks:
       - agent
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8317/health >/dev/null 2>&1 || exit 1"]
+      # bash's /dev/tcp, NOT wget or curl: this image ships neither (verified,
+      # not assumed — the same mistake the Caddy healthcheck comment warns
+      # about, where a missing tool reports "unhealthy" on a service that is
+      # actually fine).
+      #
+      # This proves the port is listening. It deliberately does NOT prove the
+      # Claude credential is valid — that is cliproxy-heartbeat's job, because
+      # checking it properly costs a real completion and must not run every
+      # 30 seconds.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8317"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -667,7 +686,12 @@ services:
       # WhatsApp pairs by QR and persists a session. Losing this volume means
       # re-scanning the code from the phone, so it is a named volume, not a
       # bind mount into the ephemeral container filesystem.
-      - openclaw_data:/root/.openclaw
+      #
+      # /home/node, NOT /root: the image runs as the `node` user and writes its
+      # state there (observed in the config-audit path it logs). Mounting
+      # /root would have persisted an empty directory while the real pairing
+      # lived in the container layer and vanished on every recreate.
+      - openclaw_data:/home/node/.openclaw
     networks:
       - agent
     depends_on:
