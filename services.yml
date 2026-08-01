@@ -81,18 +81,19 @@ services:
   # TARGET (cloudflareaccess.com), never by the status code: Uptime Kuma proved
   # in M8 that a 302 can equally mean "the app redirected you itself".
   - name: paperclip
-    port: 8080
-    description: "Ticket UI for the agent system"
+    port: 3100
+    description: "Paperclip — the agent board (upstream, M11)"
     networks: [apps, data]
     access: private
     enabled: true # M9
 
-  - name: hermes
-    port: 8081
-    description: "Hermes agent manager"
-    networks: [apps, data]
-    access: private
-    enabled: false # -> true in M9
+  # Hermes and OpenClaw are AGENT RUNTIMES, not web apps. Paperclip calls them
+  # over HTTP/SSE on the internal `agent` network; nothing outside the host ever
+  # needs to reach them. They are therefore deliberately NOT declared here —
+  # this registry generates PUBLIC routes, and a public route to an agent
+  # runtime would expose an endpoint that executes model-chosen code.
+  #
+  # They are plain compose services on `agent` only. See ADR-0020.
 
   - name: status
     port: 3001

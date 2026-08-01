@@ -35,3 +35,4 @@ venv/
 .DS_Store
 *.swp
 .idea/
+.venv-gen/

@@ -89,13 +89,13 @@ http://n8n{$ENV_PREFIX}.{$DOMAIN} {
 	}
 }
 
-# ── paperclip — Ticket UI for the agent system
+# ── paperclip — Paperclip — the agent board (upstream, M11)
 #    access: private (Cloudflare Access enforces auth at the edge)
 #    networks: apps, data
 http://paperclip{$ENV_PREFIX}.{$DOMAIN} {
 	# Upstream is the container name, resolved by Docker's embedded DNS.
 	# {$ENV_PREFIX_NAME} yields e.g. "prod-" so the target is prod-paperclip.
-	reverse_proxy {$ENV_PREFIX_NAME}paperclip:8080 {
+	reverse_proxy {$ENV_PREFIX_NAME}paperclip:3100 {
 		header_up X-Real-IP {remote_host}
 		header_up X-Forwarded-Proto https
 	}

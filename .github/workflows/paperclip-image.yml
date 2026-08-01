@@ -1,0 +1,96 @@
+# =============================================================================
+# paperclip-image.yml — build upstream Paperclip and publish it to our GHCR.
+# =============================================================================
+#
+# WHY THIS EXISTS
+#   Upstream Paperclip publishes no server image. It ships as an npm package
+#   (`npx paperclipai onboard`) or as a root Dockerfile you build yourself;
+#   GHCR under paperclipai/ holds only the agent-runtime-* sandbox images.
+#
+#   The server therefore has to build it somewhere. NOT on the VPS: a pnpm
+#   monorepo install plus a UI build wants more memory than the host has free
+#   (measured 2026-08-01: 2594 MB available of 3.7 GB, already running Postgres,
+#   n8n and six others). An OOM there does not fail politely — it kills whatever
+#   the kernel picks, which may be the database.
+#
+#   So CI builds it and the server pulls it. That is ADR-0007's pull-based
+#   deploy applied to a first-party image: CI still never holds SSH access.
+#
+# WHY BY DIGEST
+#   This job's real output is a sha256 digest, not a tag. Tags are mutable; a
+#   "pinned" tag that can move underneath you is precisely the failure ADR-0011
+#   exists to prevent. .env holds PAPERCLIP_IMAGE=...@sha256:...
+#
+# RUNNING IT
+#   Manually, via workflow_dispatch, naming the upstream tag. Deliberately not
+#   automatic: upgrading the agent platform is a decision, and an unattended
+#   agent system that silently changed version overnight is not something you
+#   want to discover by reading logs.
+# =============================================================================
+---
+name: paperclip-image
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: "Upstream Paperclip tag to build (e.g. v2026.722.0)"
+        required: true
+        default: "v2026.722.0"
+
+# Least privilege: read this repo, write packages. No id-token, no contents:write.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out upstream Paperclip at the pinned tag
+        uses: actions/checkout@v4
+        with:
+          repository: paperclipai/paperclip
+          ref: ${{ inputs.upstream_ref }}
+          # No submodules, no history: the build needs the tree, nothing else.
+          fetch-depth: 1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Lowercase the owner: GHCR rejects uppercase repository names, and
+      # GitHub usernames may contain them.
+      - name: Compute image name
+        id: name
+        run: |
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${owner}/paperclip" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # The tag is for humans reading the registry; the digest below is
+          # what actually gets deployed.
+          tags: ${{ steps.name.outputs.image }}:${{ inputs.upstream_ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The whole point of the workflow. This digest goes into .env on the
+      # server as PAPERCLIP_IMAGE.
+      - name: Report the pinned reference
+        run: |
+          {
+            printf '\n### Pin this in `.env` on the server\n\n'
+            printf '```\nPAPERCLIP_IMAGE=%s@%s\n```\n' \
+              '${{ steps.name.outputs.image }}' '${{ steps.build.outputs.digest }}'
+          } >> "$GITHUB_STEP_SUMMARY"

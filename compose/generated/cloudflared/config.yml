@@ -53,7 +53,7 @@ ingress:
   - hostname: "n8n${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
-  # paperclip — Ticket UI for the agent system [access: private]
+  # paperclip — Paperclip — the agent board (upstream, M11) [access: private]
   - hostname: "paperclip${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
