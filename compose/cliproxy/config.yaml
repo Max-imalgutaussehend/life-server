@@ -1,0 +1,69 @@
+# =============================================================================
+# config.yaml — CLIProxyAPI. (M11, ADR-0020)
+# =============================================================================
+#
+# WHAT THIS IS
+#   The one component that turns the operator's Claude subscription into an
+#   OpenAI-compatible endpoint, so Hermes and OpenClaw — which speak provider
+#   REST APIs and know nothing about Claude Code sessions — can use it.
+#
+# WHAT THIS IS NOT
+#   Supported. This is a third-party wrapper around an OAuth flow Anthropic can
+#   change without notice. ADR-0020 accepts that deliberately; every other
+#   component here is pinned and reproducible, and this one can break while
+#   nobody touches it. Treat a failure here as expected maintenance, not as a
+#   mystery.
+#
+# THE SECRET THAT LIVES HERE
+#   The OAuth credential in auth-dir. It is why this container sits on
+#   net-agent and nothing else: an agent that reaches it can spend quota, and
+#   api-keys below is what stands in the way.
+#
+# NOT EDITED AT RUNTIME. entrypoint.sh renders this template into the real
+# config, substituting PROXY_API_KEY. Keeping the secret out of the repo is the
+# entire point — see ADR-0006.
+# =============================================================================
+
+# Bind all interfaces INSIDE the container. The container is only on net-agent,
+# which has no route off the host (ADR-0004), so "all interfaces" here means
+# "reachable by Paperclip and the two runtimes" — not by the internet.
+host: ""
+port: 8317
+
+# No TLS: this hop never leaves the internal bridge. Encrypting a link that
+# cannot be observed buys nothing and adds a certificate to rotate.
+tls:
+  enable: false
+
+# THE MANAGEMENT API IS OFF, DELIBERATELY.
+#
+# An empty secret-key makes every /v0/management route return 404. That API can
+# add credentials and change routing — on a network shared with containers that
+# execute model-chosen code, leaving it reachable would hand a prompt-injected
+# session control of the proxy itself. The control panel is disabled for the
+# same reason, and because it downloads assets from GitHub at runtime, which is
+# an unpinned dependency fetched into a privileged position.
+remote-management:
+  allow-remote: false
+  secret-key: ""
+  disable-control-panel: true
+
+# Where the Claude OAuth credential is persisted. A named volume, so it
+# survives `docker compose down` — losing it means re-running the browser
+# login, which on a headless VPS is the painful path.
+auth-dir: "/data/auth"
+
+# Substituted from PROXY_API_KEY by entrypoint.sh. Without a key ANY container
+# on net-agent could spend the subscription, which is precisely the
+# prompt-injection scenario the sandbox exists to contain.
+api-keys:
+  - "__PROXY_API_KEY__"
+
+# Off: request bodies contain prompt text, and prompt text is the operator's
+# actual life — uni, work, job search. Debug logs would put that on disk in
+# plaintext for no operational benefit.
+debug: false
+
+# pprof exposes goroutine and heap dumps. Off.
+pprof:
+  enable: false

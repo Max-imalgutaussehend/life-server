@@ -14,7 +14,6 @@ add or change a service there and run `make generate`.
 
 | Service | Hostname (prod) | Hostname (dev) | Port | Access | Networks | Health |
 |---|---|---|---|---|---|---|
-| `whoami` | `whoami.$DOMAIN` | `whoami.dev.$DOMAIN` | 8000 | public | apps | `/` |
 | `n8n` | `n8n.$DOMAIN` | `n8n.dev.$DOMAIN` | 5678 | private | apps, data | `/healthz` |
 | `paperclip` | `paperclip.$DOMAIN` | `paperclip.dev.$DOMAIN` | 3100 | private | apps, data | `/` |
 | `status` | `status.$DOMAIN` | `status.dev.$DOMAIN` | 3001 | private | apps | `/` |

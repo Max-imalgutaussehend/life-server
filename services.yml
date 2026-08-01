@@ -54,15 +54,14 @@
 # ============================================================================
 
 services:
-  # Vertical-slice test target (M3). Echoes request details, proving the full
-  # path works: Cloudflare -> tunnel -> Caddy -> container. Remove once a real
-  # service has taken its place.
-  - name: whoami
-    port: 8000
-    description: "Connectivity test target — echoes request headers"
-    networks: [apps]
-    access: public # deliberately public: it must be reachable to prove the path
-    enabled: true
+  # whoami (M3) was the vertical-slice test target and is GONE as of M11. It
+  # proved Cloudflare -> tunnel -> Caddy -> container worked, which real
+  # services now prove continuously just by serving traffic.
+  #
+  # It was also the only `access: public` entry in this file — the single
+  # unauthenticated endpoint on a host that now runs agents. A request-echo is
+  # harmless in isolation and unnecessary once the path is proven, so it was
+  # removed rather than left as the one thing nobody was gating. See ADR-0020.
 
   - name: n8n
     port: 5678

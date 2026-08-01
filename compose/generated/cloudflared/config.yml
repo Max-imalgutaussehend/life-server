@@ -45,10 +45,6 @@ originRequest:
   noTLSVerify: false
 
 ingress:
-  # whoami — Connectivity test target — echoes request headers [access: public]
-  - hostname: "whoami${ENV_PREFIX}.${DOMAIN}"
-    service: http://${ENV_PREFIX_NAME}caddy:80
-
   # n8n — Workflow automation and integration engine [access: private]
   - hostname: "n8n${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80

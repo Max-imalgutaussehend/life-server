@@ -87,7 +87,10 @@ EOF
 # n8n holds credentials for everything it integrates with, which makes it the
 # most valuable target on the host after the database itself.
 #
-# paperclip is deliberately ABSENT from this list — see assertion 2b.
+# paperclip and cliproxy are deliberately ABSENT from this list — they are the
+# two permitted holes in the wall, checked by 2b and 2c instead. Hermes and
+# openclaw are also on this network and are NOT probed: they are peers of the
+# agent sessions, not resources the sandbox protects.
 while read -r host port; do
 	[ -n "$host" ] || continue
 	if probe_tcp "$host" "$port"; then
@@ -110,20 +113,58 @@ EOF
 # Reachability alone would be a regression, so this also asserts the API is
 # CLOSED without a token. An agent API reachable by anything on this network
 # would hand a prompt-injected session the entire ticket queue.
-if probe_tcp "${PREFIX}paperclip" 8080; then
-	ok "can reach ${PREFIX}paperclip:8080 (required — the ticket API)"
+if probe_tcp "${PREFIX}paperclip" 3100; then
+	ok "can reach ${PREFIX}paperclip:3100 (required — the board API)"
 
 	code="$(docker exec "$PROBE" sh -c \
-		"wget -qO- --server-response --timeout=5 --post-data='{}' \
-		 --header='Content-Type: application/json' \
-		 http://${PREFIX}paperclip:8080/api/claim 2>&1 | awk '/^  HTTP/{print \$2; exit}'" 2>/dev/null)"
+		"wget -qO- --server-response --timeout=5 \
+		 http://${PREFIX}paperclip:3100/api/companies 2>&1 | awk '/^  HTTP/{print \$2; exit}'" 2>/dev/null)"
 	case "$code" in
-		401|404) ok "the agent API rejects an unauthenticated request (HTTP ${code})" ;;
-		"")      bad "could not determine whether the agent API is authenticated" ;;
-		*)       bad "the agent API answered ${code} WITHOUT a token — it is open" ;;
+		401|403|404) ok "the board API rejects an unauthenticated request (HTTP ${code})" ;;
+		"")          bad "could not determine whether the board API is authenticated" ;;
+		*)           bad "the board API answered ${code} WITHOUT a token — it is open" ;;
 	esac
 else
-	bad "cannot reach ${PREFIX}paperclip:8080 — the runner cannot claim tickets"
+	bad "cannot reach ${PREFIX}paperclip:3100 — agents cannot reach the board"
+fi
+
+# ── 2c. The subscription proxy MUST demand its key ──────────────────────────
+# M11, ADR-0020. cliproxy holds the operator's Claude OAuth credential and
+# re-exports it as an OpenAI-compatible endpoint. It shares net-agent with
+# containers that execute model-chosen code, so an unauthenticated proxy would
+# let a prompt-injected session spend the subscription at will — and quota
+# spent is quota gone, with no undo.
+#
+# Reachability is REQUIRED (Hermes and OpenClaw have no other model access) and
+# is therefore not itself a finding; the authentication check is.
+if probe_tcp "${PREFIX}cliproxy" 8317; then
+	ok "can reach ${PREFIX}cliproxy:8317 (required — the model endpoint)"
+
+	code="$(docker exec "$PROBE" sh -c \
+		"wget -qO- --server-response --timeout=5 --post-data='{\"model\":\"claude\",\"messages\":[]}' \
+		 --header='Content-Type: application/json' \
+		 http://${PREFIX}cliproxy:8317/v1/chat/completions 2>&1 | awk '/^  HTTP/{print \$2; exit}'" 2>/dev/null)"
+	case "$code" in
+		401|403) ok "the proxy rejects an unauthenticated request (HTTP ${code})" ;;
+		"")      bad "could not determine whether the proxy is authenticated" ;;
+		*)       bad "the proxy answered ${code} WITHOUT a key — anything here can spend the subscription" ;;
+	esac
+
+	# The management API can add credentials and change routing. config.yaml
+	# leaves secret-key empty, which upstream documents as "404 everything".
+	# Asserted rather than assumed: this is one config line away from being a
+	# full admin surface on a network shared with code-executing agents.
+	code="$(docker exec "$PROBE" sh -c \
+		"wget -qO- --server-response --timeout=5 \
+		 http://${PREFIX}cliproxy:8317/v0/management/config 2>&1 | awk '/^  HTTP/{print \$2; exit}'" 2>/dev/null)"
+	case "$code" in
+		404)     ok "the proxy management API is disabled (HTTP 404)" ;;
+		401|403) ok "the proxy management API demands a key (HTTP ${code})" ;;
+		"")      bad "could not determine the state of the proxy management API" ;;
+		*)       bad "the proxy management API answered ${code} — it is reachable and may be open" ;;
+	esac
+else
+	bad "cannot reach ${PREFIX}cliproxy:8317 — the agent runtimes have no model access"
 fi
 
 # ── 3. The Docker socket must be absent ─────────────────────────────────────

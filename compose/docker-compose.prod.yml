@@ -183,7 +183,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1280M
+          # Lowered 1280M -> 768M in M11 to make room for the agent runtimes.
+          # Postgres's real ceiling here is shared_buffers (256MB) plus
+          # work_mem (8MB) x concurrent sorts, plus per-connection overhead —
+          # postgresql.conf caps connections at 100 and each service role at
+          # 20. Measured use was 89 MB on 2026-08-01. 768M leaves ~8x headroom
+          # over observed and still covers a maintenance_work_mem (128MB)
+          # VACUUM running alongside normal traffic.
+          memory: 768M
     security_opt:
       - no-new-privileges:true
 
@@ -224,7 +231,14 @@ services:
         limits:
           # Above redis.conf's 256MB maxmemory, leaving room for AOF rewrite
           # and copy-on-write during a background save.
-          memory: 512M
+          #
+          # Lowered 512M -> 320M in M11. It must stay ABOVE maxmemory (256MB)
+          # or the OOM killer, not the eviction policy, decides what goes —
+          # and redis.conf sets `noeviction`, so Redis would rather error than
+          # drop data. 320M keeps 64M for fork-time copy-on-write, which is
+          # ample at the 13 MB actually in use (measured 2026-08-01). The cap
+          # exists for the fork, not the steady state.
+          memory: 320M
     security_opt:
       - no-new-privileges:true
 
@@ -331,7 +345,13 @@ services:
         limits:
           # Node's default heap plus workflow execution overhead. Bounded so a
           # runaway workflow cannot take the host down with it.
-          memory: 1G
+          #
+          # Lowered 1G -> 512M in M11 to make room for the agent runtimes.
+          # Measured, not guessed: n8n was using 296 MB of its 1 GB limit on
+          # 2026-08-01, so this halves a RESERVATION it was not using rather
+          # than squeezing live workloads. If workflows grow heavy, raise it —
+          # but raise it against a measurement, the way it was lowered.
+          memory: 512M
     security_opt:
       - no-new-privileges:true
 
@@ -475,28 +495,179 @@ services:
       resources:
         limits:
           # A Node server with a React UI — an order of magnitude above the Go
-          # binary it replaces. Measured against a 3.7 GB host already running
-          # n8n and Postgres; see M11 for the memory budget.
-          memory: 768M
+          # binary it replaces.
+          #
+          # THIS NUMBER IS AN ESTIMATE, and the only one left in this file.
+          # Every other cap here was set against a `docker stats` reading on
+          # 2026-08-01; Paperclip has never run on this host, so 640M is a
+          # guess informed by n8n (a comparable Node service) sitting at 297M.
+          #
+          # MEASURE IT AFTER THE FIRST DEPLOY and correct this line. The sum of
+          # caps already exceeds physical RAM — safe only because caps are
+          # ceilings, not reservations, and because measured total use is
+          # ~600M. That safety depends on the estimates being roughly right.
+          memory: 640M
     security_opt:
       - no-new-privileges:true
 
-  # ── whoami — the vertical slice test target ───────────────────────────────
-  # Minimal HTTP server that echoes request details. Proves the whole path
-  # works: Cloudflare -> tunnel -> Caddy -> container. Removed once a real
-  # service occupies the slot.
-  whoami:
-    image: traefik/whoami:v1.11
-    container_name: ${ENV_PREFIX_NAME:-prod-}whoami
+  # whoami (the M3 vertical-slice test target) was removed in M11. It had
+  # served its purpose — it proved Cloudflare -> tunnel -> Caddy -> container
+  # worked — and it was the only `access: public` service here, i.e. the one
+  # unauthenticated endpoint on the host. Removing it buys ~3 MB of RAM and,
+  # more usefully, deletes a public request-echo from a box that now runs
+  # agents. See ADR-0020.
+
+  # ── cliproxy — the subscription proxy ─────────────────────────────────────
+  # Turns the operator's Claude subscription into an OpenAI-compatible endpoint
+  # so Hermes and OpenClaw — which speak provider REST APIs and know nothing
+  # about Claude Code sessions — can use it. (ADR-0020)
+  #
+  # THIS IS THE UNSUPPORTED COMPONENT. A third-party wrapper around an OAuth
+  # flow Anthropic can change without notice. Everything else in this file is
+  # pinned and reproducible; this one can break while nobody touches it.
+  #
+  # THE 7-DAY PROBLEM: the Claude OAuth credential expires roughly weekly, and
+  # when it does the whole agent system stops SILENTLY — indistinguishable from
+  # an empty queue. Uptime Kuma monitors /health for exactly this reason. That
+  # monitor is not optional; it is the difference between "it stopped" and "it
+  # stopped three days ago".
+  #
+  # ON `agent` ONLY. It holds the subscription credential, so it is deliberately
+  # kept off apps and data — and it is the reason PROXY_API_KEY exists, since
+  # otherwise anything on this network could spend the operator's quota.
+  cliproxy:
+    image: eceasy/cli-proxy-api:v7.2.113
+    container_name: ${ENV_PREFIX_NAME:-prod-}cliproxy
     restart: unless-stopped
-    command: --port=8000
+    entrypoint: ["/entrypoint.sh"]
+    environment:
+      PROXY_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      # Only so entrypoint.sh can print a copy-pasteable `docker exec` hint
+      # naming this actual container when the OAuth credential is missing.
+      ENV_PREFIX_NAME: ${ENV_PREFIX_NAME:-prod-}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./cliproxy/config.yaml:/etc/cliproxy/config.yaml:ro
+      - ./cliproxy/entrypoint.sh:/entrypoint.sh:ro
+      # Holds the OAuth credential. A named volume so `docker compose down`
+      # does not force an interactive re-login on a headless host.
+      - cliproxy_data:/data
     networks:
-      - apps
+      - agent
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8317/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          # A Go binary proxying HTTP. Generous.
+          memory: 256M
     security_opt:
       - no-new-privileges:true
-    read_only: true
+
+  # ── openclaw — the personal assistant ─────────────────────────────────────
+  # Point of contact #1: the operator talks to this on WhatsApp, and it talks to
+  # Paperclip. Paperclip reaches it through the built-in `openclaw_gateway`
+  # adapter over WebSocket. (ADR-0020)
+  #
+  # `-slim`, not `-browser`: the browser variant bundles Chromium, which this
+  # host cannot afford. An assistant that can browse is a later decision with
+  # its own memory budget, not a default.
+  #
+  # NOT IN services.yml, deliberately. That registry generates PUBLIC routes,
+  # and this container runs model-chosen code — a public route to it would be an
+  # unauthenticated RCE endpoint. WhatsApp connectivity is a QR-paired outbound
+  # session, so no inbound route is needed for it to work.
+  openclaw:
+    image: openclaw/openclaw:2026.7.1-slim
+    container_name: ${ENV_PREFIX_NAME:-prod-}openclaw
+    restart: unless-stopped
+    environment:
+      # Every model call goes through the proxy — the subscription is the only
+      # credential in this system (ADR-0020). OpenAI-compatible base URL, which
+      # is exactly what CLIProxyAPI exports.
+      OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
+      OPENAI_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      # Gates the gateway itself. Paperclip presents this as a bearer token on
+      # the WebSocket connect frame.
+      OPENCLAW_GATEWAY_KEY: ${OPENCLAW_GATEWAY_KEY:?OPENCLAW_GATEWAY_KEY is not set in .env}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      # WhatsApp pairs by QR and persists a session. Losing this volume means
+      # re-scanning the code from the phone, so it is a named volume, not a
+      # bind mount into the ephemeral container filesystem.
+      - openclaw_data:/root/.openclaw
+    networks:
+      - agent
+    depends_on:
+      cliproxy:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          # Node plus a messaging session. Sized against the 3.7 GB host; see
+          # the M11 memory budget for how this number was chosen.
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
+
+  # ── hermes — the CEO agent ────────────────────────────────────────────────
+  # Point of contact #2: the operator builds sub-agents against this in the
+  # Paperclip UI. Paperclip drives it through the built-in `hermes_gateway`
+  # adapter over HTTP/SSE. (ADR-0020)
+  #
+  # WHY GATEWAY AND NOT hermes_local: upstream's Dockerfile.hermes is a stub. It
+  # boots and then fails with "hermes not on PATH", by its own comment. The
+  # gateway adapter is the supported path and has no such gap.
+  #
+  # Built from a Dockerfile because upstream ships Hermes as a pip package with
+  # no official image. Small enough to build on the host, unlike Paperclip.
+  hermes:
+    build:
+      context: ./hermes
+    image: life-server/hermes:0.1.0
+    container_name: ${ENV_PREFIX_NAME:-prod-}hermes
+    restart: unless-stopped
+    environment:
+      # Same proxy, same single credential.
+      OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
+      OPENAI_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      # Upstream's name for the gateway key. Paperclip stores the same value as
+      # agentDefaultsPayload.apiKey so it can authenticate to Hermes.
+      API_SERVER_ENABLED: "true"
+      API_SERVER_KEY: ${HERMES_GATEWAY_KEY:?HERMES_GATEWAY_KEY is not set in .env}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - hermes_data:/data
+    networks:
+      - agent
+    depends_on:
+      cliproxy:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
+  # The Claude OAuth credential. Irreplaceable without an interactive browser
+  # login, which is the one thing a headless VPS cannot do — so this volume is
+  # the difference between a weekly re-auth and a blocked afternoon.
+  cliproxy_data:
+    name: ${ENV_PREFIX_NAME:-prod-}cliproxy-data
+
+  # The WhatsApp pairing. Losing it means re-scanning the QR from the phone.
+  openclaw_data:
+    name: ${ENV_PREFIX_NAME:-prod-}openclaw-data
+
+  hermes_data:
+    name: ${ENV_PREFIX_NAME:-prod-}hermes-data
+
   caddy_data:
     name: ${ENV_PREFIX_NAME:-prod-}caddy-data
   caddy_config:
