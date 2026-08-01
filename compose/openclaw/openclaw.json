@@ -1,42 +1,34 @@
 {
-  "//": [
-    "openclaw.json — the personal assistant's config. (M11, ADR-0020)",
-    "",
-    "WHY A FILE AND NOT ENV VARS:",
-    "OpenClaw configures model providers here, not from bare environment",
-    "variables. Setting OPENAI_BASE_URL in compose and expecting it to be",
-    "picked up does NOT work — the variable is only meaningful because it is",
-    "referenced as ${OPENAI_BASE_URL} below. Verified against the provider",
-    "docs rather than assumed.",
-    "",
-    "THE SUBSCRIPTION PATH:",
-    "baseUrl points at CLIProxyAPI on net-agent, which re-exports the",
-    "operator's Claude subscription as an OpenAI-compatible endpoint. There is",
-    "no Anthropic API key anywhere in this system (ADR-0020).",
-    "",
-    "api: openai-completions is the correct type for any self-hosted",
-    "/v1/chat/completions backend, which is exactly what the proxy presents."
-  ],
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "claude-subscription/claude-sonnet-4-5"
+      }
+    }
+  },
 
   "models": {
     "providers": {
       "claude-subscription": {
         "baseUrl": "${OPENAI_BASE_URL}",
         "apiKey": "${OPENAI_API_KEY}",
-        "api": "openai-completions"
+        "api": "openai-completions",
+        "timeoutSeconds": 300,
+        "models": [
+          {
+            "id": "claude-sonnet-4-5",
+            "name": "Claude Sonnet 4.5",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          }
+        ]
       }
-    },
-    "primary": "claude-subscription/claude-sonnet-4-5"
+    }
   },
 
   "gateway": {
-    "//": [
-      "mode is REQUIRED. Without it OpenClaw refuses to start with 'existing",
-      "config is missing gateway.mode. Treat this as suspicious or clobbered",
-      "config' — a deliberate guard against a half-written config, and a good",
-      "one. `local` means this process IS the gateway, which is what the",
-      "openclaw_gateway adapter connects to."
-    ],
     "mode": "local",
     "auth": {
       "token": "${OPENCLAW_GATEWAY_TOKEN}"
