@@ -676,6 +676,7 @@ services:
     image: openclaw/openclaw:2026.7.1-slim
     container_name: ${ENV_PREFIX_NAME:-prod-}openclaw
     restart: unless-stopped
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
     environment:
       # Every model call goes through the proxy — the subscription is the only
       # credential in this system (ADR-0020). OpenAI-compatible base URL, which
@@ -700,7 +701,18 @@ services:
       OPENCLAW_CONFIG_PATH: /config/openclaw.json
       TZ: ${TZ:-Europe/Berlin}
     volumes:
-      - ./openclaw/openclaw.json:/config/openclaw.json:ro
+      # /config is a WRITABLE volume, not a read-only bind, and that is a
+      # deliberate reversal. OpenClaw treats this directory as its own: it
+      # installs plugins into extensions/ and takes a lock file next to the
+      # config when it does. A read-only mount fails both, and the WhatsApp
+      # channel IS a plugin — so read-only here means no WhatsApp.
+      #
+      # The repo copy is seeded into the volume by the entrypoint below, which
+      # keeps the repo authoritative for content while letting OpenClaw write
+      # the sidecar files it needs.
+      - openclaw_config:/config
+      - ./openclaw/openclaw.json:/seed/openclaw.json:ro
+      - ./openclaw/entrypoint.sh:/entrypoint.sh:ro
       # WhatsApp pairs by QR and persists a session. Losing this volume means
       # re-scanning the code from the phone, so it is a named volume, not a
       # bind mount into the ephemeral container filesystem.
@@ -804,6 +816,12 @@ volumes:
   # The WhatsApp pairing. Losing it means re-scanning the QR from the phone.
   openclaw_data:
     name: ${ENV_PREFIX_NAME:-prod-}openclaw-data
+
+  # OpenClaw's config directory, including extensions/ — where the WhatsApp
+  # channel plugin is installed. Writable and persistent by necessity: OpenClaw
+  # takes a lock file beside the config and installs plugins beneath it.
+  openclaw_config:
+    name: ${ENV_PREFIX_NAME:-prod-}openclaw-config
 
   hermes_data:
     name: ${ENV_PREFIX_NAME:-prod-}hermes-data
