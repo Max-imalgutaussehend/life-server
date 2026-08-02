@@ -50,7 +50,10 @@ while true; do
 	# max_tokens:1 — the cheapest request that still forces authentication and
 	# a model round-trip. A malformed or unauthenticated request fails at the
 	# proxy and never reaches the model, which is exactly what must be caught.
-	body='{"model":"claude-sonnet-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
+	# The model id must be one the proxy actually lists at /v1/models. A bare
+	# "claude-sonnet-4-5" is NOT among them and returns 502 — verified
+	# 2026-08-02, after that guessed id made a working proxy look broken.
+	body='{"model":"claude-sonnet-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
 
 	code="$(wget -qO- --server-response --timeout=60 \
 		--header="Content-Type: application/json" \

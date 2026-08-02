@@ -2,7 +2,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "claude-subscription/claude-sonnet-4-5"
+        "primary": "claude-subscription/claude-sonnet-5"
       }
     }
   },
@@ -16,8 +16,8 @@
         "timeoutSeconds": 300,
         "models": [
           {
-            "id": "claude-sonnet-4-5",
-            "name": "Claude Sonnet 4.5",
+            "id": "claude-sonnet-5",
+            "name": "Claude Sonnet 5",
             "reasoning": false,
             "input": ["text"],
             "contextWindow": 200000,
