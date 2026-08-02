@@ -272,12 +272,26 @@ failure ADR-0011 exists to prevent.
 ### 8b. Authenticate the subscription proxy
 
 ```bash
-make proxy-login          # interactive; opens a device-code flow
+make proxy-login
 ```
+
+It prints a `claude.ai/oauth/authorize` URL. Approve it, and your browser lands
+on a **`localhost:54545` page that fails to load**. That is expected and is not
+the step failing: the callback listener runs on the VPS, so nothing on your
+phone or laptop is listening on that port.
+
+**Copy that broken page's full URL from the address bar and paste it back at
+the prompt.** The authorization code is in the URL, not in the page — which is
+why a blank error page is still a success.
 
 **Expect to repeat this roughly weekly.** The Claude OAuth credential expires
 in ~7 days. Uptime Kuma alerts before that bites (8c), but there is no headless
 way to renew it — this is the manual step the design accepts.
+
+> Verified 2026-08-01: the proxy's own suggestion is an SSH tunnel
+> (`ssh -L 54545:...`), which needs a terminal on the same device as the
+> browser. The paste-the-URL fallback above works from a phone and needs no
+> tunnel.
 
 ### 8c. Wire the credential alarm
 

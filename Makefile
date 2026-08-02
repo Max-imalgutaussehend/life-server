@@ -182,8 +182,17 @@ verify-data: ## [M4] Prove per-service DB isolation and Redis auth on the server
 # (ADR-0020). Uptime Kuma alerts before it does; this is the fix.
 .PHONY: proxy-login
 proxy-login: ## [M11] Authenticate the subscription proxy (needed ~weekly)
+	@echo "$(BOLD)==> Claude OAuth login for the proxy$(OFF)"
+	@echo "    1. Open the URL this prints and approve it."
+	@echo "    2. You land on a localhost:54545 page that FAILS TO LOAD."
+	@echo "       That is expected — the callback server is on the VPS, not on"
+	@echo "       your device, so nothing local is listening on that port."
+	@echo "    3. Copy that failed page's FULL URL from the address bar and"
+	@echo "       paste it back here. The auth code is in the URL, not the page."
+	@echo ""
 	@ssh -t -i $(SSH_KEY) deploy@$(SERVER_IP) \
-		'docker exec -it $(ENV_PREFIX_NAME)cliproxy cli-proxy-api --login claude'
+		'docker exec -it $(ENV_PREFIX_NAME)cliproxy \
+			/CLIProxyAPI/CLIProxyAPI -claude-login -no-browser -config /data/config.yaml'
 
 .PHONY: verify-agent-sandbox
 verify-agent-sandbox: ## [M9] Prove agent sessions cannot reach the data layer
