@@ -94,17 +94,51 @@ against that... these are mine design decisions"*. Recorded here because the
 asset at risk is the Anthropic account, not the server, and a future reader
 deserves to know the trade was made deliberately rather than overlooked.
 
-### The WhatsApp exception
+### One upstream guard is deliberately disabled
 
-OpenClaw's WhatsApp channel needs a publicly reachable HTTPS callback. Cloudflare
-Access gates browsers, not webhook callers — the exact problem M8 hit with ntfy,
-with the same solution: TWO Access applications, one path-scoped Bypass for the
-callback path and one Allow for the UI. The path lives on the DESTINATION, not
-the policy. Getting this wrong exposes an agent that can run shell commands.
+Paperclip refuses plain HTTP to a non-loopback gateway:
 
-Until that is configured and VERIFIED BY REDIRECT TARGET (never by status code —
-see M8, where a 302 meant "the app redirected you itself"), the OpenClaw route
-stays disabled.
+> Hermes gateway apiBaseUrl uses remote plain HTTP for "prod-hermes". Use HTTPS
+> or set dangerouslyAllowInsecureRemoteHttp=true only for unsafe local
+> development.
+
+That guard is right in general and wrong here, so it is switched off for the CEO
+agent only. `prod-hermes` is not "remote": it is a container name that resolves
+solely on `net-agent`, an internal Docker bridge with no route off the host
+(ADR-0004). The traffic never touches a network anyone can observe, so TLS would
+encrypt a hop that cannot be intercepted, in exchange for a certificate to issue,
+mount and rotate.
+
+The upstream check cannot distinguish "another host on the internet" from
+"another container on an internal bridge" — both are simply not-loopback. This is
+the same reasoning that makes `sslmode=disable` correct on the Postgres
+connection, and it is recorded here rather than left as an unexplained flag in a
+database row.
+
+**If Hermes ever moves off this host, this must be revisited.** The flag would
+then mean exactly what its name says.
+
+### WhatsApp needs NO public route — an earlier draft of this ADR was wrong
+
+This document previously claimed OpenClaw's WhatsApp channel required a publicly
+reachable HTTPS callback, and prescribed two Cloudflare Access applications to
+expose it safely. **That was incorrect**, and it is corrected here rather than
+quietly edited away, because the wrong version would have led to building a
+public route to a container that executes shell commands.
+
+OpenClaw pairs with WhatsApp over **WhatsApp Web (Baileys)**: the gateway opens
+an OUTBOUND WebSocket, exactly as the browser client does. Upstream is explicit
+that this "requires no publicly reachable callback URL". Nothing inbound is
+needed, so `openclaw` stays out of `services.yml`, has no hostname, no Caddy
+route and no Access application — the same posture as Hermes.
+
+The error came from generalising a search result about hosting OpenClaw's web UI
+into a claim about the WhatsApp channel specifically. The lesson is the one this
+milestone kept relearning: check the artifact, not the plausible summary.
+
+**What WhatsApp actually needs** is a way to get a short-lived QR code from the
+server's terminal onto the operator's phone before it expires. That is a
+delivery problem, not a networking one.
 
 ## Alternatives rejected
 

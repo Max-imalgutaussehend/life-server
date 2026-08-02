@@ -12,9 +12,14 @@ What is left, in order:
 
 | | Task | Needs |
 |---|---|---|
+| 9 | Pair WhatsApp | a QR scan from the phone — **the last step to a working system** |
 | 6 | Close port 22 | ~10 min, dashboard + a cold reconnect test |
-| 7 | M9 questions | two answers, no work |
 | 4 | Automate off-host backups | a decision (B2 credentials) |
+
+**M11 is deployed as of 2026-08-02.** Paperclip, Hermes and OpenClaw run on the
+Claude subscription through CLIProxyAPI; the sandbox holds at 20/20; the
+credential alarm has been proven in both directions (DOWN on a real failure, UP
+on a real completion). Task 8 is complete.
 
 ---
 
@@ -319,46 +324,44 @@ and spent quota has no undo.
 
 ---
 
-## 9. 🔴 WhatsApp: TWO Access applications, not one
+## 9. 🟡 WhatsApp: just a QR scan — no Access applications needed
 
-OpenClaw pairs with WhatsApp by QR and needs a **publicly reachable HTTPS
-callback**. Cloudflare Access gates browsers, not webhook callers — so a single
-Allow policy would silently break delivery, exactly as it would have for ntfy in
-M8.
+**An earlier version of this task was wrong** and told you to create two
+Cloudflare Access applications for an OpenClaw callback. Ignore that. OpenClaw
+pairs over WhatsApp Web (Baileys) with an OUTBOUND WebSocket, exactly like the
+browser client, and upstream states it "requires no publicly reachable callback
+URL".
 
-**The path lives on the DESTINATION, not on the policy.** That is why this takes
-two applications; putting a path on a Bypass policy scopes nothing and leaves
-the whole hostname open.
+So there is nothing to expose. `openclaw` has no hostname, no Caddy route and no
+Access application — and it should stay that way, because it runs shell commands.
 
-| | App A — callback | App B — the UI |
-|---|---|---|
-| Name | `openclaw-hook` | `openclaw-web` |
-| Destination | `openclaw.maxrommel.de` **+ path** `/webhook` | `openclaw.maxrommel.de`, path empty |
-| Policy | **Bypass** → Everyone | **Allow** → Emails → `max.rml@web.de` |
-| Session | n/a | 24 hours |
+### What is actually needed
 
-Order matters: create **A first**. With B alone, the callback is gated and
-pairing fails in a way that looks like WhatsApp being broken.
+A QR code, scanned from your phone, before it expires. Upstream warns:
 
-### Verify by REDIRECT TARGET, never by status code
+> On remote or headless hosts, have a reliable path to deliver the live QR to
+> the phone before starting login; terminal-rendered QRs, screenshots, or chat
+> attachments can expire in transit.
+
+Ask Claude to run the pairing. It will start:
 
 ```bash
-# The UI must bounce to Cloudflare Access:
-curl -s -o /dev/null -D - https://openclaw.maxrommel.de/ | grep -i location
-#   -> must contain cloudflareaccess.com
-
-# The callback must NOT be gated:
-curl -s -o /dev/null -w '%{http_code}\n' https://openclaw.maxrommel.de/webhook
-#   -> 200/404/405 are all fine. A cloudflareaccess.com redirect is NOT.
+docker exec -it prod-openclaw openclaw channels login --channel whatsapp
 ```
 
-M8 proved why the status code alone lies: Uptime Kuma returned 302 because it
-redirects `/` to `/dashboard` itself, and passed a naive check while completely
-open.
+and relay the QR to you. Then, on your phone:
 
-**Until both applications exist and verify, leave OpenClaw off the public
-route.** It runs shell commands; an ungated route to it is remote code
-execution.
+**WhatsApp → Settings → Linked Devices → Link a Device → scan.**
+
+Have WhatsApp already open on that screen BEFORE the QR is generated. The code
+is short-lived, and a slow round trip is the most likely reason a first attempt
+fails.
+
+### After pairing
+
+The session persists in the `prod-openclaw-data` volume, so this is a one-time
+step — unless that volume is lost, which is why it is a named volume and not a
+container-layer path (a bug that was caught and fixed in M11).
 
 ---
 
