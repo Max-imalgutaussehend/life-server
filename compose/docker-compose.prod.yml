@@ -492,7 +492,26 @@ services:
       # invite/join flow needs real accounts. Access gates the browser; this
       # gates the API.
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is not set in .env}
+      # Without this, Better Auth derives the origin from the incoming request
+      # and warns that "callbacks and redirects may not work correctly". Behind
+      # a tunnel that is not theoretical: the request arrives with the internal
+      # hostname, so login redirects and invite links would point at
+      # prod-paperclip:3100 — a name that resolves only inside Docker.
+      BETTER_AUTH_URL: https://paperclip.${DOMAIN:?DOMAIN is not set in .env}
       TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      # PAPERCLIP_HOME. Not optional, and not obvious: the container ran for
+      # 10 hours with no mount at all, which looked completely healthy because
+      # nothing here is needed to SERVE — only to survive.
+      #
+      # What lives here: the instance config, and the hourly database backups
+      # Paperclip takes on its own (it reports "databaseBackup: enabled" at
+      # /api/health). Unmounted, those backups sit in the container layer and
+      # are destroyed by exactly the event that would make you want them.
+      #
+      # The same mistake as OpenClaw's /root vs /home/node mount, and the same
+      # shape: state written somewhere the volume is not.
+      - paperclip_data:/paperclip
     networks:
       - apps
       - data
@@ -751,6 +770,10 @@ volumes:
   # the difference between a weekly re-auth and a blocked afternoon.
   cliproxy_data:
     name: ${ENV_PREFIX_NAME:-prod-}cliproxy-data
+
+  # Paperclip's instance config and its own hourly database backups.
+  paperclip_data:
+    name: ${ENV_PREFIX_NAME:-prod-}paperclip-data
 
   # The WhatsApp pairing. Losing it means re-scanning the QR from the phone.
   openclaw_data:
