@@ -3,11 +3,17 @@
 Personal AI infrastructure on a single Hetzner VPS. Ubuntu 24.04, everything in
 Docker, everything reproducible from this repository.
 
-> **Status:** M0–M5, M7 and M8 complete. The stack is live: Cloudflare Tunnel →
-> Caddy → n8n, on PostgreSQL and Redis, with restic backups (restore rehearsed,
-> off-host copy verified), Uptime Kuma + ntfy alerting proven by a real outage,
-> and secrets encrypted in Git with CI enforcing the repository's invariants.
-> See [`docs/milestones/`](docs/milestones/) for each milestone.
+> **Status:** M0–M5, M7, M8 complete; M11 deployed. The stack is live:
+> Cloudflare Tunnel → Caddy → n8n and Paperclip, on PostgreSQL and Redis, with
+> restic backups (restore rehearsed, off-host copy verified), Uptime Kuma + ntfy
+> alerting proven by a real outage, and secrets encrypted in Git with CI
+> enforcing the repository's invariants.
+>
+> The agent system runs: Paperclip as the board, Hermes as the CEO, OpenClaw as
+> the WhatsApp assistant, all on one Claude subscription behind a proxy. The
+> sandbox keeping them away from the data layer is tested rather than asserted —
+> `make verify-agent-sandbox`, currently 20/20. See
+> [`docs/milestones/`](docs/milestones/) for each milestone.
 >
 > Every private hostname sits behind Cloudflare Access as of 2026-07-31. The one
 > deliberate exception is the ntfy topic path, which the phone app needs and
@@ -55,7 +61,13 @@ graph TB
             subgraph AppsNet["network: apps"]
                 N8N[n8n]
                 PC[paperclip]
-                HER[hermes]
+                KUMA[uptime kuma]
+            end
+
+            subgraph AgentNet["network: agent — runs model-chosen code"]
+                HER[hermes<br/>CEO]
+                OC[openclaw<br/>WhatsApp]
+                PROXY[cliproxy<br/>holds the subscription]
             end
 
             subgraph DataNet["network: data — internal, no egress"]
@@ -66,11 +78,13 @@ graph TB
             CFD --> CADDY
             CADDY --> N8N
             CADDY --> PC
-            CADDY --> HER
             N8N --> PG
             PC --> PG
-            HER --> PG
             N8N --> RD
+            HER --> PROXY
+            OC --> PROXY
+            HER --> PC
+            OC --> PC
         end
     end
 
@@ -78,6 +92,7 @@ graph TB
     Docker -->|encrypted| BK[(offsite backups<br/>restic)]
 
     style DataNet fill:#2d3748,stroke:#e53e3e,color:#fff
+    style AgentNet fill:#2d3748,stroke:#d69e2e,color:#fff
     style UFW fill:#742a2a,color:#fff
     style CF fill:#2c5282,color:#fff
 ```
@@ -87,6 +102,15 @@ limited. Web traffic arrives through an outbound-initiated Cloudflare tunnel,
 so ports 80 and 443 are never open. Databases sit on an internal network with
 no route to the internet and are reachable only by containers explicitly placed
 there.
+
+**The agent network is the newest boundary and the most important one.** Hermes
+and OpenClaw execute code a language model chose, so they get their own segment
+with no route to Postgres, Redis, n8n or Uptime Kuma. They reach the board
+through Paperclip's API — an interface, never a connection string — and reach
+models through a proxy that demands a key. `make verify-agent-sandbox` starts a
+container on that network and attempts everything an escaped agent would; all 20
+assertions must fail to connect. See
+[ADR-0020](docs/adr/0020-upstream-paperclip-and-subscription-proxy.md).
 
 ## Repository layout
 
@@ -150,7 +174,7 @@ Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
 | M8.5 | Remote access | 🔶 designed — [ADR-0016](docs/adr/0016-ssh-via-cloudflare-access.md) replaces Tailscale with Access SSH. Port 22 still open pending operator verification ([M8.5](docs/milestones/M8.5.md)) |
 | M9 | Applications | ✅ agent loop + web UI ([M9](docs/milestones/M9.md)) — both replaced in M11 |
 | M10 | Agents on the server | ✅ superseded by M11 — `claude setup-token` proved ADR-0017 wrong |
-| M11 | Paperclip + agents | 🔶 built, not deployed — upstream Paperclip, Hermes CEO, OpenClaw on WhatsApp ([M11](docs/milestones/M11.md)) |
+| M11 | Paperclip + agents | 🔶 deployed, sandbox 20/20 — awaiting the proxy login ([M11](docs/milestones/M11.md)) |
 
 ## Requirements
 

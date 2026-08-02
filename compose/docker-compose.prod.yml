@@ -517,15 +517,14 @@ services:
           # A Node server with a React UI — an order of magnitude above the Go
           # binary it replaces.
           #
-          # THIS NUMBER IS AN ESTIMATE, and the only one left in this file.
-          # Every other cap here was set against a `docker stats` reading on
-          # 2026-08-01; Paperclip has never run on this host, so 640M is a
-          # guess informed by n8n (a comparable Node service) sitting at 297M.
+          # MEASURED, no longer an estimate: 361 MB after 9 hours of uptime
+          # (2026-08-02), against this 640M cap. The guess held.
           #
-          # MEASURE IT AFTER THE FIRST DEPLOY and correct this line. The sum of
-          # caps already exceeds physical RAM — safe only because caps are
-          # ceilings, not reservations, and because measured total use is
-          # ~600M. That safety depends on the estimates being roughly right.
+          # Kept at 640M rather than tightened: Paperclip runs agent sessions
+          # and hourly database backups, so steady state is the floor and not
+          # the peak. The sum of caps exceeds physical RAM, which is safe only
+          # because caps are ceilings rather than reservations — total real use
+          # is ~1.2 GB of 3.8 GB.
           memory: 640M
     security_opt:
       - no-new-privileges:true
