@@ -27,12 +27,19 @@ FROM python:3.13-slim-trixie
 # no less to what goes inside them.
 ARG HERMES_VERSION=0.19.0
 
+# aiohttp is NOT a hermes-agent dependency, and its absence is near-silent:
+# the gateway starts, logs "API Server: aiohttp not installed" at WARNING, then
+# runs happily with no adapter and no listener on 8642. Paperclip's
+# hermes_gateway adapter then cannot connect to something that looks alive.
+# Observed 2026-08-02; the container had been "Up" for ten hours serving
+# nothing.
+#
 # tini as PID 1: the gateway spawns a child process per run, and without an
 # init to reap them the container accumulates zombies until it cannot fork.
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends tini curl \
 	&& rm -rf /var/lib/apt/lists/* \
-	&& pip install --no-cache-dir "hermes-agent==${HERMES_VERSION}"
+	&& pip install --no-cache-dir "hermes-agent==${HERMES_VERSION}" aiohttp
 
 # Non-root. This container executes model-chosen code, so the M9 sandbox rule
 # applies in full: uid 65534 owns nothing worth taking, and

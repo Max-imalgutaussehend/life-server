@@ -749,6 +749,17 @@ services:
       # agentDefaultsPayload.apiKey so it can authenticate to Hermes.
       API_SERVER_ENABLED: "true"
       API_SERVER_KEY: ${HERMES_GATEWAY_KEY:?HERMES_GATEWAY_KEY is not set in .env}
+      # Hermes binds 127.0.0.1 by DEFAULT, which inside a container means "no
+      # other container can reach me". The gateway starts, the healthcheck
+      # passes (it runs inside, where loopback works), and Paperclip cannot
+      # connect to something that looks entirely healthy.
+      #
+      # 0.0.0.0 here means all interfaces OF THIS CONTAINER, and it is only on
+      # net-agent — which has no route off the host (ADR-0004). API_SERVER_KEY
+      # is still required on every request; upstream enforces it even on
+      # loopback binds.
+      API_SERVER_HOST: 0.0.0.0
+      API_SERVER_PORT: 8642
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       - hermes_data:/data
@@ -757,6 +768,21 @@ services:
     depends_on:
       cliproxy:
         condition: service_healthy
+    healthcheck:
+      # Hermes had NO healthcheck until M11's deploy, and that is exactly how it
+      # sat "Up" for ten hours with its API server never started: aiohttp was
+      # missing, the gateway logged a WARNING and carried on. A container that
+      # reports healthy while serving nothing is worse than one that crashes.
+      #
+      # Probes the CONTAINER NAME, not 127.0.0.1. Loopback would pass while
+      # Hermes was bound loopback-only and unreachable by Paperclip — a health
+      # check that succeeds during the outage it exists to detect. Using the
+      # routable address makes it test the path that actually matters.
+      test: ["CMD-SHELL", "curl -fsS --max-time 5 http://${ENV_PREFIX_NAME:-prod-}hermes:8642/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
