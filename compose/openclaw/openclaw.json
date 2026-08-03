@@ -28,6 +28,40 @@
     }
   },
 
+  "channels": {
+    "whatsapp": {
+      "enabled": true,
+
+      "dmPolicy": "allowlist",
+      "allowFrom": ["491726024679"],
+      "groupPolicy": "disabled",
+
+      "accounts": {
+        "default": {
+          "enabled": true
+        }
+      },
+      "defaultAccount": "default"
+    }
+  },
+
+  "tools": {
+    "profile": "messaging",
+    "toolSearch": {
+      "enabled": true,
+      "mode": "directory"
+    }
+  },
+
+  "plugins": {
+    "allow": ["whatsapp"],
+    "entries": {
+      "whatsapp": {
+        "enabled": true
+      }
+    }
+  },
+
   "gateway": {
     "mode": "local",
     "auth": {

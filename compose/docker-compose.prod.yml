@@ -293,6 +293,17 @@ services:
       # than the Docker bridge address.
       N8N_PROXY_HOPS: 1
 
+      # --- Node heap --------------------------------------------------------
+      # State the V8 heap ceiling instead of letting V8 infer one from the
+      # cgroup limit. Inference is what caused the M11 crash loop (see the
+      # memory limit below): a limit change silently moved the heap ceiling
+      # under a workload that had not changed at all.
+      #
+      # Held below the 768M container limit so V8 hits ITS ceiling first and
+      # fails with a JS stack trace, rather than the kernel OOM-killer picking
+      # the process — or another one.
+      NODE_OPTIONS: --max-old-space-size=640
+
       # --- Operational ------------------------------------------------------
       GENERIC_TIMEZONE: ${TZ:-Europe/Berlin}
       TZ: ${TZ:-Europe/Berlin}
@@ -346,12 +357,20 @@ services:
           # Node's default heap plus workflow execution overhead. Bounded so a
           # runaway workflow cannot take the host down with it.
           #
-          # Lowered 1G -> 512M in M11 to make room for the agent runtimes.
-          # Measured, not guessed: n8n was using 296 MB of its 1 GB limit on
-          # 2026-08-01, so this halves a RESERVATION it was not using rather
-          # than squeezing live workloads. If workflows grow heavy, raise it —
-          # but raise it against a measurement, the way it was lowered.
-          memory: 512M
+          # RAISED BACK 512M -> 768M on 2026-08-02 after the 512M cap put n8n
+          # into a crash loop: 6131 restarts, dying ~18s into every boot with
+          # "Ineffective mark-compacts near heap limit".
+          #
+          # The M11 reasoning was measured but measured the WRONG NUMBER. RSS
+          # was 296 MB, so 512M looked like slack. But V8 sizes its heap ceiling
+          # from the CGROUP LIMIT at startup, not from observed RSS — halving
+          # the limit halved the ceiling, and n8n's boot-time heap sat above it.
+          # A container can therefore OOM its runtime while `docker stats` shows
+          # it at 29% of the limit, which is exactly what this one did.
+          #
+          # NODE_OPTIONS above makes the ceiling explicit rather than inferred,
+          # so this failure cannot recur silently if the limit is tuned again.
+          memory: 768M
     security_opt:
       - no-new-privileges:true
 
