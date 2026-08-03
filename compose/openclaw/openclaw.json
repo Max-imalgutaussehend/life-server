@@ -45,6 +45,10 @@
     }
   },
 
+  "messages": {
+    "responsePrefix": "🤖"
+  },
+
   "tools": {
     "profile": "messaging",
     "toolSearch": {

@@ -53,6 +53,24 @@
 #     The defaults (pairing/allowlist) are close, but this is the one surface
 #     reachable from the public internet, so it is stated rather than inherited.
 #
+#   messages.responsePrefix = "🤖 "
+#     The operator talks to the assistant in their OWN WhatsApp self-chat, so
+#     both sides are the same account and every bubble renders identically —
+#     question and answer are visually indistinguishable. The prefix marks
+#     which bubbles came from the agent.
+#
+#     GLOBAL, not under channels.whatsapp. The plugin reads
+#     `cfg.messages.responsePrefix`; there is no channels.whatsapp.messages in
+#     the schema, so setting it there validates fine and does nothing.
+#
+#     OpenClaw would auto-prefix self-chats with the agent's identity name, but
+#     only when responsePrefix is unset AND an identity name exists. Only a
+#     device keypair exists here (no display name), so the fallback never fired
+#     and replies arrived unmarked. Setting this explicitly is the fix.
+#
+#     Superseded by a second WhatsApp number if one is ever added — then the
+#     chat has two real participants and the prefix becomes noise.
+#
 #   tools.profile=messaging + toolSearch.mode=directory
 #     NOT a preference — a hard requirement of the subscription proxy. The full
 #     36-tool catalog makes a ~76 KB request, and above ~54 KB the upstream
