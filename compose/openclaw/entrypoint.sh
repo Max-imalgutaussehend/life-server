@@ -71,6 +71,29 @@
 #     Superseded by a second WhatsApp number if one is ever added — then the
 #     chat has two real participants and the prefix becomes noise.
 #
+#   ⚠️ THE MEASURED CEILING IS BELOW WHAT THIS AGENT NEEDS (2026-08-24)
+#     Removing the skill catalogue cut the request from 32,359 to 27,331 B and
+#     it STILL returns HTTP 400. Bisected on the captured request:
+#       2 tools / 25,910 B -> 200
+#       3 tools / 26,380 B -> 400
+#     Hermes, same proxy, same hour, tipped at 31,032 / 31,339 B instead — so
+#     this is a TOKEN budget, not a byte one, and a token-dense prompt hits it
+#     sooner. Each tool alone passes; only combinations fail.
+#
+#     Ruled out by testing, not by assumption: the native /v1/messages endpoint
+#     (same 400), and claude-sonnet-4-6 / opus-4-7 / fable-5 (all 400). It is
+#     account-wide and protocol-independent.
+#
+#     What remains of the prompt is 17.2 KB of load-bearing sections (identity,
+#     safety, behaviour) with no single large block left to cut. So OpenClaw
+#     cannot currently run agent turns through this proxy — outbound SENDING
+#     works (`openclaw message send`, verified end to end), reasoning does not.
+#
+#     This is exactly the risk ADR-0020 accepted in writing: "a third-party
+#     wrapper around an OAuth flow Anthropic can change without notice". It
+#     changed. The escape hatch named there — a real API key, or OpenRouter —
+#     is now the decision to make; it is the operator's, not this file's.
+#
 #   agents.defaults.skills = []
 #     The image ships 30+ skills (meme-maker, diagram-maker, node-connect, ...)
 #     and lists every one of them IN THE SYSTEM PROMPT — 5,013 B of the 22,664 B

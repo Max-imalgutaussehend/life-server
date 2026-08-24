@@ -36,16 +36,37 @@ SYNC_ONLY=false
 
 [[ -f "$REPO/.env" ]] || { echo "error: .env missing. Run: make setup" >&2; exit 1; }
 
+# ── One TCP connection, reused ──────────────────────────────────────────────
+# UFW rate-limits port 22 at SIX new connections per 30 seconds (`ufw limit`,
+# ADR-0013). This script opens rsync plus four ssh calls, which lands exactly
+# on that ceiling — so a routine deploy would intermittently lock the operator
+# out of their own server, with `Connection refused` that looks like a dead
+# sshd. Diagnosed 2026-08-24 from /proc/net/xt_recent, after fail2ban had been
+# wrongly blamed twice (its ignoreip was working fine).
+#
+# ControlMaster multiplexes every call below over ONE connection, so a deploy
+# costs a single slot. Do not "fix" a future rate-limit problem by loosening
+# the UFW rule: that rule is absorbing real attacks continuously.
+# NOT under $TMPDIR: on macOS that path is ~50 characters before the socket
+# name is appended, and a Unix domain socket is capped at 104. The failure is
+# "path too long for Unix domain socket", which reads like an ssh bug.
+SSH_CTL="$HOME/.ssh/ls-deploy-%r@%h:%p"
+SSH_OPTS=(-i "$SSH_KEY" -o BatchMode=yes
+	-o ControlMaster=auto -o ControlPath="$SSH_CTL" -o ControlPersist=120)
+
+cleanup_ssh() { ssh -O exit -o ControlPath="$SSH_CTL" "$SERVER" 2>/dev/null || true; }
+trap cleanup_ssh EXIT
+
 echo "==> syncing $REPO -> $SERVER:$REMOTE_DIR"
 rsync -az --delete \
-	-e "ssh -i $SSH_KEY -o BatchMode=yes" \
+	-e "ssh ${SSH_OPTS[*]}" \
 	--exclude '.git/' \
 	--exclude '__pycache__/' \
 	--exclude '.DS_Store' \
 	"$REPO/" "$SERVER:$REMOTE_DIR/"
 
 # .env carries secrets and must not be readable by other users on the host.
-ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" "chmod 600 $REMOTE_DIR/.env"
+ssh "${SSH_OPTS[@]}" "$SERVER" "chmod 600 $REMOTE_DIR/.env"
 
 if $SYNC_ONLY; then
 	echo "==> sync complete (--sync-only)"
@@ -61,7 +82,7 @@ echo "==> starting stack"
 # `docker run`, not declared as services here. Without this the network exists
 # only if someone remembered to create it by hand — and `verify-agent-sandbox`
 # would fail for a reason that has nothing to do with the boundary it tests.
-ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" "
+ssh "${SSH_OPTS[@]}" "$SERVER" "
 	set -euo pipefail
 	cd $REMOTE_DIR
 	AGENT_NET=\"\$(grep -E '^ENV_PREFIX_NAME=' .env 2>/dev/null | cut -d= -f2-)\"
@@ -90,7 +111,7 @@ CADDY_CONTAINER="$(grep -E '^ENV_PREFIX_NAME=' "$REPO/.env" 2>/dev/null | cut -d
 CADDY_CONTAINER="${CADDY_CONTAINER:-prod-}caddy"
 
 echo "==> checking Caddy's loaded routes"
-ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" "
+ssh "${SSH_OPTS[@]}" "$SERVER" "
 	set -euo pipefail
 	cd $REMOTE_DIR
 	on_disk=\$(sha256sum compose/generated/caddy/Caddyfile | cut -d' ' -f1)
@@ -105,5 +126,5 @@ ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" "
 "
 
 echo "==> container status"
-ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" \
+ssh "${SSH_OPTS[@]}" "$SERVER" \
 	"docker ps --format 'table {{.Names}}\t{{.Status}}'"
