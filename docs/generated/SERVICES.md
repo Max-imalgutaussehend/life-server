@@ -16,6 +16,7 @@ add or change a service there and run `make generate`.
 |---|---|---|---|---|---|---|
 | `n8n` | `n8n.$DOMAIN` | `n8n.dev.$DOMAIN` | 5678 | private | apps, data | `/healthz` |
 | `paperclip` | `paperclip.$DOMAIN` | `paperclip.dev.$DOMAIN` | 3100 | private | apps, data | `/` |
+| `portfolio` | `portfolio.$DOMAIN` | `portfolio.dev.$DOMAIN` | 8080 | public | apps | `/` |
 | `status` | `status.$DOMAIN` | `status.dev.$DOMAIN` | 3001 | private | apps | `/` |
 | `ntfy` | `ntfy.$DOMAIN` | `ntfy.dev.$DOMAIN` | 80 | private | apps | `/` |
 

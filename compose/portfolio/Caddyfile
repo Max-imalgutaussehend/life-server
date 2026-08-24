@@ -1,0 +1,44 @@
+# =============================================================================
+# Caddyfile — the portfolio's own file server. (M12)
+# =============================================================================
+#
+# WHY A SECOND CADDY AND NOT A `file_server` IN THE MAIN ONE
+#   The main Caddyfile is GENERATED from services.yml (ADR-0014). Teaching the
+#   generator to emit a file-server block for one service would mean a second
+#   kind of service in the registry — a special case that every future reader
+#   has to learn. A tiny sidecar keeps the registry uniform: every entry is
+#   still "a hostname that reverse-proxies to a container".
+#
+# WHY admin off
+#   Same reason as the main proxy: the admin API can rewrite this config at
+#   runtime, and nothing here ever needs to.
+# =============================================================================
+
+{
+	auto_https off
+	admin off
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+}
+
+http://:8080 {
+	root * /srv/site
+	file_server
+
+	# The site is static and rebuilt only on deploy, so a long cache is safe
+	# and keeps repeat visits off the origin entirely.
+	header Cache-Control "public, max-age=3600"
+
+	# This host serves files and nothing else. These headers cost nothing and
+	# close the obvious classes of abuse for a page with no scripts at all.
+	header X-Content-Type-Options "nosniff"
+	header X-Frame-Options "DENY"
+	header Referrer-Policy "no-referrer"
+	header Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+	# Health endpoint for the container healthcheck and Uptime Kuma.
+	respond /healthz "ok" 200
+}

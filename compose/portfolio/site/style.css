@@ -1,0 +1,136 @@
+/* maxrommel.de — no build step, no external resources, system fonts only. */
+
+:root {
+  --bg:        #fbfbfa;
+  --surface:   #ffffff;
+  --text:      #1a1a18;
+  --muted:     #55554f;
+  --rule:      #e0e0da;
+  --accent:    #7a4c1e;
+  --measure:   36rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:      #14140f;
+    --surface: #1c1c17;
+    --text:    #ecece6;
+    --muted:   #a8a89f;
+    --rule:    #33332c;
+    --accent:  #e0a86a;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+}
+
+.wrap {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.6rem 1rem;
+  border: 2px solid var(--accent);
+  z-index: 10;
+}
+.skip-link:focus { left: 0.5rem; top: 0.5rem; }
+
+/* --- hero --- */
+
+.hero {
+  padding-block: clamp(3.5rem, 12vw, 6.5rem) clamp(2rem, 6vw, 3.5rem);
+  border-bottom: 1px solid var(--rule);
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(1.65rem, 6vw, 2.4rem);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.lede {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.0625rem;
+}
+
+/* --- sections --- */
+
+main { padding-block: clamp(2.5rem, 8vw, 4rem); }
+
+section + section { margin-top: clamp(2.5rem, 8vw, 3.75rem); }
+
+h2 {
+  margin: 0 0 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+p { margin: 0 0 1.1rem; }
+p:last-child { margin-bottom: 0; }
+
+.priorities {
+  margin: 0 0 1.1rem;
+  padding-left: 1.4rem;
+}
+.priorities li { margin-bottom: 0.5rem; }
+.priorities li::marker { color: var(--muted); }
+
+.contact { color: var(--muted); }
+
+a {
+  color: inherit;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+a:hover { text-decoration-thickness: 2px; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* --- footer --- */
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding-block: 1.75rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}

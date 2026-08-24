@@ -84,6 +84,7 @@ def load_services() -> list[dict]:
 
     seen_names: set[str] = set()
     seen_ports: dict[int, str] = {}
+    apex_owner: str | None = None
     result: list[dict] = []
 
     for i, svc in enumerate(services):
@@ -136,6 +137,27 @@ def load_services() -> list[dict]:
         if not isinstance(enabled, bool):
             raise RegistryError(f"{where} ({name}): 'enabled' must be true or false")
 
+        # apex: serve on the bare DOMAIN (and www) instead of <name>.<DOMAIN>.
+        #
+        # The hostname rule everywhere else is <name><ENV_PREFIX>.<DOMAIN>, which
+        # cannot express the root domain — there is no label to put the service
+        # name in. A public site belongs on the bare domain, so the registry
+        # needs a way to say so rather than the Caddyfile growing a hand-written
+        # exception that `make check` would then fight with (ADR-0014).
+        #
+        # Only ONE service may claim it: two apex entries would render two Caddy
+        # site blocks for the same address, and Caddy would refuse to start.
+        apex = svc.get("apex", False)
+        if not isinstance(apex, bool):
+            raise RegistryError(f"{where} ({name}): 'apex' must be true or false")
+        if apex and enabled:
+            if apex_owner is not None:
+                raise RegistryError(
+                    f"{where} ({name}): apex is already claimed by {apex_owner!r}. "
+                    "Only one enabled service may serve the bare domain."
+                )
+            apex_owner = name
+
         # Port collisions only matter among services actually deployed.
         if enabled:
             if port in seen_ports:
@@ -155,6 +177,7 @@ def load_services() -> list[dict]:
                 "envs": envs,
                 "healthcheck": svc.get("healthcheck", "/"),
                 "enabled": enabled,
+                "apex": apex,
                 # Uppercased name for env var keys: n8n -> N8N
                 "env_key": name.upper().replace("-", "_"),
             }

@@ -62,7 +62,22 @@ http://:80 {
 #    access: {{ svc.access }}{% if svc.access == 'private' %} (Cloudflare Access enforces auth at the edge){% endif %}
 
 #    networks: {{ svc.networks | join(', ') }}
+{% if svc.apex %}
+# APEX: served on the bare domain and on www, not on <name>.<DOMAIN>.
+# Both addresses are listed explicitly because Caddy matches site addresses
+# literally — a block for the bare domain does NOT also answer for www.
+#
+# ⚠️ THIS BLOCK IS NOT ENV-PREFIXED, and it is the one place in this file that
+# is not. A bare domain has no label to put ".dev" into, so prod and dev would
+# both claim {$DOMAIN} and the second stack to start would fail to bind.
+#
+# Consequence: only ONE environment may run an apex service. Today that is
+# prod. If a dev apex is ever needed it has to be a real second domain, not a
+# prefix — which is a registry change, not a template tweak (ADR-0010).
+http://{$DOMAIN}, http://www.{$DOMAIN} {
+{% else %}
 http://{{ svc.name }}{$ENV_PREFIX}.{$DOMAIN} {
+{% endif %}
 	# Upstream is the container name, resolved by Docker's embedded DNS.
 	# {$ENV_PREFIX_NAME} yields e.g. "prod-" so the target is prod-{{ svc.name }}.
 	reverse_proxy {$ENV_PREFIX_NAME}{{ svc.name }}:{{ svc.port }} {

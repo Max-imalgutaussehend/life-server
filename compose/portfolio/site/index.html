@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Max Rommel</title>
+<meta name="description" content="Max Rommel builds and operates a self-hosted personal AI infrastructure — automation, agents and the plumbing that keeps them running.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Max Rommel</p>
+    <h1>I build the infrastructure that runs my own AI assistants.</h1>
+    <p class="lede">
+      Self-hosted, automated end to end, and documented well enough that
+      I can rebuild the whole thing from scratch.
+    </p>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+
+    <section aria-labelledby="build">
+      <h2 id="build">What I build</h2>
+      <p>
+        A small, private platform that hosts a set of AI agents and the services they
+        depend on. It runs on a single rented server, entirely under my own control:
+        containerised services, a private network with no directly exposed ports, an
+        encrypted secrets workflow, and a database and cache layer the agents share.
+      </p>
+      <p>
+        On top of that sits an automation layer — workflows that pick up events, route
+        them to the right agent, and deliver the results back to me on whatever channel
+        I happen to be using. The agents cover the areas of my life that generate
+        recurring work: university, my job, the job search, and personal projects.
+      </p>
+      <p>
+        The unglamorous half matters just as much: scheduled encrypted backups with
+        restore drills, health checks and alerting, configuration management so the
+        machine can be re-provisioned from code, and continuous integration that
+        refuses to let a broken change reach the server.
+      </p>
+    </section>
+
+    <section aria-labelledby="approach">
+      <h2 id="approach">Approach</h2>
+      <p>
+        When two options conflict, I decide in a fixed order. It removes most of the
+        arguing with myself:
+      </p>
+      <ol class="priorities">
+        <li><strong>Security</strong> — the default answer is the closed one.</li>
+        <li><strong>Maintainability</strong> — I will be the one reading this in a year.</li>
+        <li><strong>Simplicity</strong> — fewer moving parts beats a clever one.</li>
+        <li><strong>Automation</strong> — anything done twice by hand gets written down as code.</li>
+        <li><strong>Reproducibility</strong> — if it only exists on one machine, it does not exist.</li>
+      </ol>
+      <p>
+        Every decision of consequence gets a short written record: what was chosen, what
+        was rejected, and why. Several of those records exist mainly because I later
+        proved myself wrong and wanted the correction on file.
+      </p>
+    </section>
+
+    <section aria-labelledby="contact">
+      <h2 id="contact">Contact</h2>
+      <p class="contact">
+        Reach me at <a href="mailto:illuminati_max@web.de">illuminati_max@web.de</a>.
+      </p>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>&copy; 2026 Max Rommel</p>
+  </div>
+</footer>
+
+</body>
+</html>

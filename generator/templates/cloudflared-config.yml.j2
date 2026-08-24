@@ -49,8 +49,16 @@ ingress:
 {% if enabled_services %}
 {% for svc in enabled_services %}
   # {{ svc.name }} — {{ svc.description }} [access: {{ svc.access }}]
+{% if svc.apex %}
+  - hostname: "${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
+  - hostname: "www.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+{% else %}
   - hostname: "{{ svc.name }}${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
+{% endif %}
 
 {% endfor %}
 {% else %}

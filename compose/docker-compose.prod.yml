@@ -466,6 +466,51 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ── portfolio — the one public thing on this host ─────────────────────────
+  # A static personal site on the bare domain (M12). It is the first
+  # `access: public` service since whoami was removed in M11, so the reasoning
+  # is worth stating rather than implying.
+  #
+  # WHAT MAKES IT SAFE TO EXPOSE, where whoami was not worth the risk:
+  #   - It serves FILES. No request echo, no application logic, no input to
+  #     parse, no session, no database.
+  #   - `apps` ONLY. It cannot reach Postgres, Redis or the agent network, so
+  #     there is nothing to take from it and nowhere to pivot to.
+  #   - read_only with a tmpfs for Caddy's scratch space: even a write
+  #     primitive has nowhere to persist.
+  #   - The site is mounted :ro from the repo, so the container cannot alter
+  #     what it serves.
+  #
+  # The content lives in Git and is deployed by rsync like everything else —
+  # there is no build step and no CMS to keep patched, which is the point.
+  portfolio:
+    image: caddy:2.10.2-alpine
+    container_name: ${ENV_PREFIX_NAME:-prod-}portfolio
+    restart: unless-stopped
+    volumes:
+      - ./portfolio/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./portfolio/site:/srv/site:ro
+    networks:
+      - apps
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          # A static file server for two files. This is already generous.
+          memory: 64M
+    read_only: true
+    tmpfs:
+      # Caddy wants a writable data/config dir even with `admin off`.
+      - /data
+      - /config
+    security_opt:
+      - no-new-privileges:true
+
   # ── Paperclip ─────────────────────────────────────────────────────────────
   # The real upstream Paperclip (M11, ADR-0020), replacing the hand-written Go
   # UI that M9 built. Upstream ships the board, the agent adapters and the

@@ -94,6 +94,36 @@ services:
   #
   # They are plain compose services on `agent` only. See ADR-0020.
 
+  # ── THE ONLY PUBLIC SERVICE ON THIS HOST ──────────────────────────────────
+  # A static portfolio on the bare domain. `access: public` is deliberate and
+  # is the first such entry since whoami was removed in M11 — so it deserves
+  # the same scrutiny that removal did.
+  #
+  # WHY IT IS ACCEPTABLE HERE, where whoami was not:
+  #   - It serves FILES, not a request echo and not an application. There is no
+  #     input to parse, no session, no database, no state to corrupt.
+  #   - The container holds no credential: `networks: [apps]` only, so it has
+  #     no route to Postgres or Redis, and nothing to steal if it is breached.
+  #   - Caddy serves it read-only; the site is a bind mount from this repo.
+  #
+  # apex: true means it answers on maxrommel.de and www.maxrommel.de rather
+  # than portfolio.maxrommel.de. Exactly one enabled service may claim this;
+  # the generator rejects a second one.
+  #
+  # DO NOT put anything dynamic behind this hostname without a new ADR. The
+  # value of "one public endpoint that only serves static files" is that the
+  # sentence stays true.
+  # Port 8080, not 80: ntfy already listens on 80 inside its own container, and
+  # the generator refuses two enabled services on the same port. The number is
+  # container-internal either way — nothing is published to the host (ADR-0003).
+  - name: portfolio
+    port: 8080
+    description: "Static personal site on the bare domain"
+    networks: [apps]
+    access: public
+    apex: true
+    enabled: true # M12
+
   - name: status
     port: 3001
     description: "Uptime Kuma — service monitoring and alerting"

@@ -53,6 +53,13 @@ ingress:
   - hostname: "paperclip${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
+  # portfolio — Static personal site on the bare domain [access: public]
+  - hostname: "${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
+  - hostname: "www.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
   # status — Uptime Kuma — service monitoring and alerting [access: private]
   - hostname: "status${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
