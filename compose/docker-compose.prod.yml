@@ -723,6 +723,144 @@ services:
       - no-new-privileges:true
     read_only: true
 
+  # ── omniroute — the fallback model router (M13, ADR-0021) ─────────────────
+  # WHAT PROBLEM THIS SOLVES
+  #   The subscription proxy returns HTTP 400 above a token budget that
+  #   OpenClaw's smallest workable prompt already exceeds (measured: 3 tools /
+  #   26,380 B fails, 2 tools / 25,910 B passes). Every avenue inside the proxy
+  #   was tried first — fewer tools, no skills, all four models, the native
+  #   /v1/messages endpoint. The ceiling is account-wide and
+  #   protocol-independent, so it cannot be configured away.
+  #
+  #   This router sits BESIDE the proxy, not in front of it: the subscription is
+  #   still tier 1 and answers every request it can. Only a request the proxy
+  #   refuses falls through to a second provider. Nothing that works today
+  #   starts taking a different path.
+  #
+  # WHY THIS IS A REVERSAL, AND WHERE IT IS ARGUED
+  #   ADR-0018 rejected exactly this shape — "route across dozens of free LLM
+  #   providers" — on data-custody grounds, and that reasoning has NOT been
+  #   retracted. ADR-0021 records why the trade changed for this one container
+  #   and what was given up. Read it before adding a second consumer.
+  #
+  # NETWORK: `agent` only.
+  #   Not `data` (it has no business near Postgres), not `apps` (that is where
+  #   n8n's credentials live). It talks to OpenClaw and to the internet, and
+  #   that is the whole of its reach.
+  #
+  # NOT IN services.yml, for the same reason as openclaw and cliproxy: that
+  # registry generates PUBLIC routes, and an unauthenticated public router
+  # holding provider keys is a credential-exfiltration endpoint.
+  omniroute:
+    build:
+      context: ./omniroute
+    image: life-server/omniroute:0.1.0
+    container_name: ${ENV_PREFIX_NAME:-prod-}omniroute
+    restart: unless-stopped
+    environment:
+      # Gates the router's own /v1. Without this ANY container on `agent` —
+      # including a prompt-injected agent session — could drive it and spend
+      # provider quota, or read the configured providers back out.
+      OMNIROUTE_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
+      OMNIROUTE_PORT: 20128
+      TZ: ${TZ:-Europe/Berlin}
+      # Tier 1 — the subscription, still answering everything it can. These are
+      # referenced by omniroute.json as ${CLIPROXY_*}; setting them without that
+      # file would configure nothing (the same trap openclaw.json documents).
+      CLIPROXY_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
+      CLIPROXY_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      # Tier 2 — inert until a key exists. `:-` and NOT `:?`, deliberately:
+      # this service must come up and route through tier 1 alone, so a missing
+      # key is a degraded fallback, not a failed boot. omniroute.json keeps the
+      # provider `"enabled": false` to match.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # ── the memory budget, which is the operator's actual requirement ──
+      # "das was am wenigsten speicher zieht aber alles andere hergibt".
+      # Three advertised subsystems are the expensive ones, and none of them
+      # is needed for fallback routing:
+      #
+      #   dashboard — a Next.js 16 app. The single largest cost, and it exists
+      #     to configure providers by hand. Provider config is declared in
+      #     omniroute.json below instead, which is also what keeps this
+      #     reproducible from Git (ADR-0014's principle, applied by hand
+      #     because this service is not in the registry).
+      #   memory — FTS5 + a Qdrant vector store. OpenClaw keeps its own
+      #     conversational state; a second memory here would be a duplicate
+      #     copy of the operator's private messages in a component that did
+      #     not exist yesterday.
+      #   semantic cache — embeddings on every request, for a workload of a
+      #     few messages a day. Pure overhead at this volume.
+      #
+      # What is deliberately KEPT: routing, tier fallback, circuit breakers,
+      # provider translation. That is the part being paid for.
+      #
+      # ⚠️ THESE NAMES ARE UNVERIFIED. They follow the OMNIROUTE_* convention
+      # the upstream docs use for PORT and API_KEY, but the authoring host had
+      # no route to the upstream docs (operator uplink was IPv6-only, server is
+      # v4). An env var this app does not recognise is IGNORED SILENTLY — it
+      # does not fail the way a bad Compose key would. So the first deploy must
+      # confirm the dashboard is actually down and memory actually off, by
+      # measurement (`docker stats`), not by reading this block back.
+      OMNIROUTE_DASHBOARD_ENABLED: "false"
+      OMNIROUTE_MEMORY_ENABLED: "false"
+      OMNIROUTE_SEMANTIC_CACHE_ENABLED: "false"
+      OMNIROUTE_TELEMETRY_ENABLED: "false"
+      # TLS-fingerprint stealth is an advertised feature and is switched OFF on
+      # purpose. Its function is to make an automated client look like a
+      # browser to providers that forbid automated use — i.e. to defeat a
+      # counterparty's terms rather than to work within them. That is the same
+      # objection ADR-0018 raised against option B, and it does not stop being
+      # true because the feature is convenient.
+      OMNIROUTE_STEALTH_ENABLED: "false"
+      OMNIROUTE_CONFIG_PATH: /data/omniroute.json
+    volumes:
+      # SQLite database + AES-encrypted provider credentials. A named volume:
+      # losing it means re-entering every provider key by hand.
+      - omniroute_data:/data
+      # Declared provider/routing config, seeded by the entrypoint. Same
+      # repo-authoritative-content / volume-owns-directory split as OpenClaw,
+      # and for the same reason: the app writes sidecar state next to its
+      # config, so the directory cannot be a read-only bind.
+      - ./omniroute/omniroute.json:/seed/omniroute.json:ro
+      - ./omniroute/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/sbin/tini", "--", "/bin/sh", "/entrypoint.sh"]
+    networks:
+      - agent
+    depends_on:
+      # Tier 1 must be up before the router starts taking requests. Without
+      # this the first few calls fail against a proxy that is merely still
+      # booting, and three failures trip the circuit breaker — parking the
+      # subscription for a cooldown and sending traffic to tier 2 for no
+      # reason at all.
+      cliproxy:
+        condition: service_healthy
+    healthcheck:
+      # wget, not bash's /dev/tcp: this is Alpine and ships busybox wget but no
+      # bash. Verified against the image rather than assumed — the mistake the
+      # cliproxy healthcheck comment above exists to warn about.
+      #
+      # /v1/models proves the router is actually serving its API, not merely
+      # that a port is open.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:20128/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          # Node + SQLite with the dashboard, vector memory and semantic cache
+          # all disabled. Upstream quotes no figure, so this is a CEILING, not
+          # a measurement: if the container is OOM-killed on first run the
+          # trimming above did not do what it claims, and that is worth
+          # finding out loudly rather than by slow degradation.
+          #
+          # Host budget: ~2 GB free. openclaw already holds 512M, cliproxy
+          # 256M. 256M here keeps the total inside that.
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
+
   # ── openclaw — the personal assistant ─────────────────────────────────────
   # Point of contact #1: the operator talks to this on WhatsApp, and it talks to
   # Paperclip. Paperclip reaches it through the built-in `openclaw_gateway`
@@ -742,11 +880,24 @@ services:
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     environment:
-      # Every model call goes through the proxy — the subscription is the only
-      # credential in this system (ADR-0020). OpenAI-compatible base URL, which
-      # is exactly what CLIProxyAPI exports.
-      OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
-      OPENAI_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      # Model calls now go through the ROUTER, which puts the subscription
+      # first and falls through only when it refuses (M13, ADR-0021).
+      #
+      # This used to point straight at cliproxy:8317. It stopped working: the
+      # subscription returns HTTP 400 above an account-wide token budget that
+      # this agent's smallest workable prompt already exceeds, and no amount of
+      # trimming tools or skills got under it. The router does not fix that
+      # ceiling — it stops the ceiling from being the end of the request.
+      #
+      # cliproxy is NOT bypassed. It is tier 1 inside omniroute.json and still
+      # answers everything it can; the subscription remains the primary
+      # credential exactly as ADR-0020 intended.
+      #
+      # Still OPENAI_* and still openai-completions: the router exports the
+      # same OpenAI-compatible shape cliproxy did, so openclaw.json needs no
+      # change beyond the URL these vars carry.
+      OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}omniroute:20128/v1
+      OPENAI_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
       # Gates the gateway itself. Paperclip presents this as a bearer token on
       # the WebSocket connect frame.
       #
@@ -789,7 +940,10 @@ services:
     networks:
       - agent
     depends_on:
-      cliproxy:
+      # omniroute, not cliproxy — the router is what this container now talks
+      # to, and it in turn waits for cliproxy. Waiting on cliproxy here as well
+      # would be redundant.
+      omniroute:
         condition: service_healthy
     deploy:
       resources:
@@ -927,6 +1081,13 @@ volumes:
   # takes a lock file beside the config and installs plugins beneath it.
   openclaw_config:
     name: ${ENV_PREFIX_NAME:-prod-}openclaw-config
+
+  # OmniRoute's SQLite database and AES-encrypted provider credentials, plus
+  # the seeded config. Persistent because losing it means re-entering every
+  # provider key by hand — the credentials are encrypted at rest inside it and
+  # exist nowhere else.
+  omniroute_data:
+    name: ${ENV_PREFIX_NAME:-prod-}omniroute-data
 
   hermes_data:
     name: ${ENV_PREFIX_NAME:-prod-}hermes-data
