@@ -71,6 +71,23 @@
 #     Superseded by a second WhatsApp number if one is ever added — then the
 #     chat has two real participants and the prefix becomes noise.
 #
+#   agents.defaults.skills = []
+#     The image ships 30+ skills (meme-maker, diagram-maker, node-connect, ...)
+#     and lists every one of them IN THE SYSTEM PROMPT — 5,013 B of the 22,664 B
+#     prompt, measured 2026-08-24 from a captured request. None of them apply to
+#     a WhatsApp assistant, and the catalogue is what pushed this agent over the
+#     size limit below while it had only 7 tools enabled.
+#
+#     An empty allowlist is the supported way to say "none" (an OMITTED key
+#     means unrestricted, which is the opposite). Skills can be re-enabled
+#     individually by naming them here.
+#
+#     WHERE THE BYTES ACTUALLY WENT — the tools were never the problem:
+#       system prompt 22,664 B  (skills 5,013 · persona files ~3,700)
+#       tools (7)      9,151 B  (of which `message` alone 6,532)
+#       user text      1,048 B
+#       total         32,359 B  -> HTTP 400
+#
 #   tools.profile=messaging + toolSearch.mode=directory
 #     NOT a preference — a hard requirement of the subscription proxy. The full
 #     36-tool catalog makes a ~76 KB request, and above ~54 KB the upstream

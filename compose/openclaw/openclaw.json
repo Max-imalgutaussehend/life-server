@@ -3,10 +3,10 @@
     "defaults": {
       "model": {
         "primary": "claude-subscription/claude-sonnet-5"
-      }
+      },
+      "skills": []
     }
   },
-
   "models": {
     "providers": {
       "claude-subscription": {
@@ -19,7 +19,9 @@
             "id": "claude-sonnet-5",
             "name": "Claude Sonnet 5",
             "reasoning": false,
-            "input": ["text"],
+            "input": [
+              "text"
+            ],
             "contextWindow": 200000,
             "maxTokens": 8192
           }
@@ -27,15 +29,14 @@
       }
     }
   },
-
   "channels": {
     "whatsapp": {
       "enabled": true,
-
       "dmPolicy": "allowlist",
-      "allowFrom": ["491726024679"],
+      "allowFrom": [
+        "491726024679"
+      ],
       "groupPolicy": "disabled",
-
       "accounts": {
         "default": {
           "enabled": true
@@ -44,11 +45,9 @@
       "defaultAccount": "default"
     }
   },
-
   "messages": {
     "responsePrefix": "🤖"
   },
-
   "tools": {
     "profile": "messaging",
     "toolSearch": {
@@ -56,16 +55,16 @@
       "mode": "directory"
     }
   },
-
   "plugins": {
-    "allow": ["whatsapp"],
+    "allow": [
+      "whatsapp"
+    ],
     "entries": {
       "whatsapp": {
         "enabled": true
       }
     }
   },
-
   "gateway": {
     "mode": "local",
     "auth": {
