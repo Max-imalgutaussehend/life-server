@@ -774,8 +774,49 @@ services:
     restart: unless-stopped
     environment:
       # Same proxy, same single credential.
+      #
+      # OPENAI_* is NOT enough, and that is not obvious: Hermes maps
+      # OPENAI_BASE_URL to its `openai-api` provider, which speaks
+      # `codex_responses` — a different protocol from the OpenAI-compatible
+      # /v1/chat/completions that CLIProxyAPI exports. With only these set,
+      # Hermes falls back to its built-in default provider (OpenRouter) and
+      # sends `model: ""`, which openrouter.ai answers with
+      # "HTTP 401: Missing Authentication header". That 401 is what left the
+      # CEO agent in `error` from 2026-08-03 until 2026-08-24, and it names
+      # neither Hermes nor the real cause.
+      #
+      # LM_* selects the `lmstudio` overlay instead: transport `openai_chat`
+      # plus a settable base URL — the only built-in combination that matches
+      # what the proxy actually speaks. Both pairs are kept: OPENAI_* for any
+      # tool that reads the conventional names, LM_* for what Hermes uses.
       OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
       OPENAI_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      LM_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
+      LM_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+
+      # THE TOOL BUDGET IS LOAD-BEARING, and it is not stored here — it lives
+      # in the hermes_data volume (`hermes tools disable ...`). Recorded here
+      # because the failure it prevents is silent and expensive to re-diagnose.
+      #
+      # Above roughly 31 KB of request body, the upstream answers HTTP 400
+      # "Third-party apps now draw from your extra usage, not your plan
+      # limits" — which reads like a billing problem and is not one. Measured
+      # 2026-08-24 against this proxy, bisected tool by tool:
+      #   10 tools / 31,032 B  -> 200 OK
+      #   11 tools / 31,339 B  -> 400
+      # 307 bytes apart, so it is a threshold, not a coincidence.
+      #
+      # NOTE the number differs from OpenClaw's ~54 KB (see openclaw/
+      # entrypoint.sh): that one was measured with different content, so the
+      # real limit is evidently token-based rather than byte-based. Do not
+      # treat either figure as the constant — measure with `hermes
+      # prompt-size` after enabling anything.
+      #
+      # Currently enabled (10 tools, ~24.5 KB): terminal, file,
+      # code_execution, todo, clarify, delegation. Disabled to fit: browser,
+      # computer_use, image_gen, tts, vision, web, session_search, cronjob,
+      # skills, memory — all either useless headless or not needed by a CEO
+      # agent whose job is to plan and delegate.
       # Upstream's name for the gateway key. Paperclip stores the same value as
       # agentDefaultsPayload.apiKey so it can authenticate to Hermes.
       API_SERVER_ENABLED: "true"

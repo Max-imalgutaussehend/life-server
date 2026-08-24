@@ -11,7 +11,17 @@ findtime = {{ fail2ban_findtime }}
 maxretry = {{ fail2ban_maxretry }}
 backend  = systemd
 # Never ban loopback or Docker's default bridge range.
-ignoreip = 127.0.0.1/8 ::1 172.16.0.0/12
+#
+# fail2ban_ignore_extra holds the operator's own address(es). This is not a
+# convenience: `mode = aggressive` counts a closed connection as a failure, so
+# a deploy — which opens several SSH sessions in a row — can ban the very
+# machine that runs it. That happened on 2026-08-24 and cost an hour, because
+# the symptom (`Connection refused`) is indistinguishable from a dead sshd.
+#
+# A home IP changes, so this is a variable rather than a committed address:
+# set it in group_vars/all.yml, or leave it empty on a host you administer
+# from somewhere else.
+ignoreip = 127.0.0.1/8 ::1 172.16.0.0/12{% if fail2ban_ignore_extra %} {{ fail2ban_ignore_extra }}{% endif %}
 
 [sshd]
 enabled  = true

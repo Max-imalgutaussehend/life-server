@@ -21,6 +21,12 @@ swappiness: 10
 ssh_port: 22
 
 # fail2ban: 5 failures in 10 min -> 1 h ban.
+#
+# Addresses fail2ban must never ban, space-separated. The operator's own
+# address belongs here: `mode = aggressive` treats a closed connection as a
+# failure, so a normal deploy can lock you out of your own server.
+# Empty is valid and simply adds nothing.
+fail2ban_ignore_extra: "165.1.187.194"
 fail2ban_maxretry: 5
 fail2ban_findtime: 10m
 fail2ban_bantime: 1h
