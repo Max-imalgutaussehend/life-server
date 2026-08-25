@@ -1,88 +1,147 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  index.html — maxrommel.de
+
+  Single column, centred, no JavaScript, no external requests. The CSP in
+  ../Caddyfile is `default-src 'none'`, so anything fetched from another origin
+  would simply not load — that is deliberate, not a limitation to work around.
+
+  WHAT IS DELIBERATELY NOT HERE
+    The phone number from the CV. A public page on a personal domain is
+    trivially scraped, and a mobile number on one reliably turns into spam
+    calls. Email only.
+
+    Internal figures from the SAP roles (deal counts, pipeline sizes,
+    programme names) are generalised. The work is described the way it would
+    be described to a stranger: what it was, what changed, no internal metrics.
+-->
 <title>Max Rommel</title>
-<meta name="description" content="Max Rommel builds and operates a self-hosted personal AI infrastructure — automation, agents and the plumbing that keeps them running.">
-<meta name="color-scheme" content="light dark">
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
+<meta name="description" content="Business Information Systems student at DHBW Mannheim and SAP SE. Multi-agent systems, private equity technology, and things that run on their own." />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="/style.css" />
 
-<a class="skip-link" href="#main">Skip to content</a>
+<nav>
+  <a href="#about">About</a>
+  <a href="#work">Work</a>
+  <a href="#building">Building</a>
+  <a href="#contact">Contact</a>
+</nav>
 
-<header class="hero">
-  <div class="wrap">
-    <p class="eyebrow">Max Rommel</p>
-    <h1>I build the infrastructure that runs my own AI assistants.</h1>
-    <p class="lede">
-      Self-hosted, automated end to end, and documented well enough that
-      I can rebuild the whole thing from scratch.
+<main>
+  <header>
+    <h1>Max Rommel</h1>
+    <p class="tagline">
+      Business Information Systems at DHBW Mannheim &amp; SAP SE.
+      Mannheim, Germany.
     </p>
-  </div>
-</header>
+  </header>
 
-<main id="main">
-  <div class="wrap">
+  <section id="about">
+    <p class="lead">
+      Hi, I'm Max. I study business information systems in a dual programme with
+      SAP, which means I spend half my time on coursework and the other half on
+      problems that already have people waiting on the answer.
+    </p>
+    <p>
+      Most of what I find interesting sits where a technical question turns into
+      a commercial one. Whether an optimisation approach is fast enough is a
+      research question; whether it is fast enough <em>to be worth paying for</em>
+      is a different one, and usually the harder of the two. My thesis is on
+      that boundary — benchmarking quantum optimisation against classical solvers
+      on supply chain problems, and looking for the point where the hardware
+      stops being a science project.
+    </p>
+    <p>
+      Outside that: I wrestled competitively for over ten years and still run
+      long distances, which has taught me more about finishing things than any
+      productivity system has.
+    </p>
+  </section>
 
-    <section aria-labelledby="build">
-      <h2 id="build">What I build</h2>
-      <p>
-        A small, private platform that hosts a set of AI agents and the services they
-        depend on. It runs on a single rented server, entirely under my own control:
-        containerised services, a private network with no directly exposed ports, an
-        encrypted secrets workflow, and a database and cache layer the agents share.
-      </p>
-      <p>
-        On top of that sits an automation layer — workflows that pick up events, route
-        them to the right agent, and deliver the results back to me on whatever channel
-        I happen to be using. The agents cover the areas of my life that generate
-        recurring work: university, my job, the job search, and personal projects.
-      </p>
-      <p>
-        The unglamorous half matters just as much: scheduled encrypted backups with
-        restore drills, health checks and alerting, configuration management so the
-        machine can be re-provisioned from code, and continuous integration that
-        refuses to let a broken change reach the server.
-      </p>
-    </section>
+  <section id="work">
+    <h2>Work</h2>
 
-    <section aria-labelledby="approach">
-      <h2 id="approach">Approach</h2>
+    <article>
+      <h3>Private Equity Relations &amp; Consulting <span class="where">SAP, New York</span></h3>
+      <p class="when">2026</p>
       <p>
-        When two options conflict, I decide in a fixed order. It removes most of the
-        arguing with myself:
+        Built a scoring framework that combined rule-based signals with language
+        models to prioritise live deals, replacing blanket coverage with
+        something the team could actually act on. Consolidated a fragmented
+        picture of portfolio companies and deals into one view, which turned
+        research that took weeks into research that took seconds. Ran deep dives
+        on business models and AI value creation across technology portfolio
+        companies, advising sponsors and implementation partners from diligence
+        through to execution.
       </p>
-      <ol class="priorities">
-        <li><strong>Security</strong> — the default answer is the closed one.</li>
-        <li><strong>Maintainability</strong> — I will be the one reading this in a year.</li>
-        <li><strong>Simplicity</strong> — fewer moving parts beats a clever one.</li>
-        <li><strong>Automation</strong> — anything done twice by hand gets written down as code.</li>
-        <li><strong>Reproducibility</strong> — if it only exists on one machine, it does not exist.</li>
-      </ol>
+    </article>
+
+    <article>
+      <h3>AI Research &amp; Advisory <span class="where">SAP, Walldorf</span></h3>
+      <p class="when">2025 – 2026</p>
       <p>
-        Every decision of consequence gets a short written record: what was chosen, what
-        was rejected, and why. Several of those records exist mainly because I later
-        proved myself wrong and wanted the correction on file.
+        Researched multi-agent decision-making under Bayesian game theory and
+        reinforcement learning, improving agentic decision optimisation by 172%
+        over a self-routing baseline in a microgrid test case. Generalised the
+        result into a reusable framework, released open source under the SAP
+        organisation, and translated the findings into material that
+        non-researchers could act on.
       </p>
-    </section>
+    </article>
 
-    <section aria-labelledby="contact">
-      <h2 id="contact">Contact</h2>
-      <p class="contact">
-        Reach me at <a href="mailto:illuminati_max@web.de">illuminati_max@web.de</a>.
+    <article>
+      <h3>Partner Evaluation &amp; Integration <span class="where">SAP, Walldorf</span></h3>
+      <p class="when">2025</p>
+      <p>
+        Scouted and evaluated external exchange and infrastructure providers on
+        both technical and commercial terms, then owned the resulting integration
+        into SAP's core ERP end to end — from evaluation through to production.
+        The solution was subsequently adopted into the product suite.
       </p>
-    </section>
+    </article>
 
-  </div>
+    <article>
+      <h3>Private Equity Team &amp; Staff Unit <span class="where">Mannheim Investment Club</span></h3>
+      <p class="when">2025 – present</p>
+      <p>
+        Deal analysis, business model assessment and market research at one of
+        the largest student finance societies in the DACH region, including live
+        transaction work with mid-market private equity firms. Separately, I
+        scaled the club's information systems to its current 700+ members,
+        reporting to the executive board.
+      </p>
+    </article>
+  </section>
+
+  <section id="building">
+    <h2>What I'm building</h2>
+    <p>
+      A small self-hosted system that runs my own life admin — a ticket queue,
+      a handful of agents that pick work off it, and a messaging bridge so I can
+      task it from my phone. It is deliberately over-engineered for what it does:
+      segmented networks, a single source of truth for every service, and a
+      written record of every architectural decision including the ones that
+      turned out badly.
+    </p>
+    <p>
+      The interesting part has not been the agents. It has been everything
+      around them — least privilege for something that executes code it wrote
+      itself, and monitoring that catches silent failure rather than loud
+      failure. Loud failures take care of themselves.
+    </p>
+  </section>
+
+  <section id="contact">
+    <h2>Contact</h2>
+    <p class="email">
+      <a href="mailto:illuminati_max@web.de">illuminati_max@web.de</a>
+    </p>
+    <p class="quiet">
+      Open to conversations about multi-agent systems, private equity
+      technology, or anything that has to keep running when nobody is watching.
+    </p>
+  </section>
 </main>
 
 <footer>
-  <div class="wrap">
-    <p>&copy; 2026 Max Rommel</p>
-  </div>
+  <p>Mannheim, Germany</p>
 </footer>
-
-</body>
-</html>
