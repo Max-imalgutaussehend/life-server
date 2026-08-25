@@ -3,8 +3,7 @@
     "defaults": {
       "model": {
         "primary": "omniroute/cliproxy/claude-sonnet-5"
-      },
-      "skills": []
+      }
     }
   },
   "models": {
@@ -49,16 +48,13 @@
     "responsePrefix": "\ud83e\udd16"
   },
   "tools": {
-    "profile": "messaging",
+    "profile": "full",
     "toolSearch": {
       "enabled": true,
       "mode": "directory"
     }
   },
   "plugins": {
-    "allow": [
-      "whatsapp"
-    ],
     "entries": {
       "whatsapp": {
         "enabled": true
