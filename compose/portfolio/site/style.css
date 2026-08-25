@@ -3,8 +3,17 @@
 
   Single column, centred, generous whitespace. No webfont: the CSP forbids
   external origins, and a system font stack renders instantly and looks
-  native on every platform — which is closer to the intended feel than a
-  self-hosted webfont would be anyway.
+  native on every platform.
+
+  THE TABS ARE CSS, NOT JAVASCRIPT
+    Four radio inputs sit at the top of the document, hidden. Each <label>
+    points at one, and a checked input reveals its panel through a sibling
+    selector. That is why the inputs must precede everything they affect —
+    CSS can style forward (~) but never backward.
+
+    The trade this makes: no URL fragment per tab, so a link cannot open the
+    CV directly. In exchange the page works with JS disabled, needs no
+    script-src exception in the CSP, and ships zero kilobytes of behaviour.
 
   Dark mode is honoured because the browser asks for it, not via a toggle.
 */
@@ -16,7 +25,7 @@
 	--paper: #fdfdfc;
 	--rule: #e4e4e7;
 	--link: #1a1a1a;
-	--measure: 34rem; /* ~68 characters — the readable line length */
+	--measure: 38rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -51,53 +60,128 @@ body {
 	-webkit-font-smoothing: antialiased;
 }
 
-/* ── navigation ─────────────────────────────────────────────────────────── */
-
-nav {
-	max-width: var(--measure);
-	margin: 0 auto;
-	padding: 2.5rem 1.5rem 0;
-	display: flex;
-	gap: 1.5rem;
-}
-
-nav a {
-	color: var(--ink-quiet);
-	text-decoration: none;
-	font-size: 0.9rem;
-}
-
-nav a:hover {
-	color: var(--ink);
-}
-
-/* ── page ───────────────────────────────────────────────────────────────── */
-
 main {
 	max-width: var(--measure);
 	margin: 0 auto;
 	padding: 0 1.5rem;
 }
 
+/* ── header ─────────────────────────────────────────────────────────────── */
+
 header {
-	margin: 4rem 0 3rem;
+	display: flex;
+	align-items: center;
+	gap: 1.5rem;
+	margin: 4rem 0 2.5rem;
+}
+
+.portrait {
+	width: 140px;
+	height: 140px;
+	border-radius: 50%;
+	object-fit: cover;
+	flex-shrink: 0;
+	/* The source is 560px for a 140px slot: 4x, so it stays sharp on retina
+	   and when the browser zooms. */
 }
 
 h1 {
 	font-size: 2rem;
 	font-weight: 600;
 	letter-spacing: -0.02em;
-	margin: 0 0 0.5rem;
+	margin: 0 0 0.4rem;
 }
 
 .tagline {
 	color: var(--ink-quiet);
 	margin: 0;
 	font-size: 0.95rem;
+	line-height: 1.5;
 }
 
-section {
-	margin: 0 0 3.5rem;
+/* ── tabs ───────────────────────────────────────────────────────────────── */
+
+/* Hidden but still focusable, so the tabs remain keyboard-reachable.
+   `display: none` would remove them from the tab order entirely. */
+input[name="tab"] {
+	position: absolute;
+	opacity: 0;
+	width: 1px;
+	height: 1px;
+	pointer-events: none;
+}
+
+.tabs {
+	display: flex;
+	gap: 0.25rem;
+	border-bottom: 1px solid var(--rule);
+	margin-bottom: 2.5rem;
+	overflow-x: auto;
+}
+
+.tabs label {
+	padding: 0.6rem 0.9rem;
+	font-size: 0.9rem;
+	color: var(--ink-quiet);
+	cursor: pointer;
+	white-space: nowrap;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tabs label:hover {
+	color: var(--ink);
+}
+
+.panel {
+	display: none;
+	margin-bottom: 3rem;
+}
+
+/* Each checked input reveals its own panel and lights its own label. */
+#t-about:checked ~ main #p-about,
+#t-research:checked ~ main #p-research,
+#t-projects:checked ~ main #p-projects,
+#t-cv:checked ~ main #p-cv {
+	display: block;
+}
+
+#t-about:checked ~ main label[for="t-about"],
+#t-research:checked ~ main label[for="t-research"],
+#t-projects:checked ~ main label[for="t-projects"],
+#t-cv:checked ~ main label[for="t-cv"] {
+	color: var(--ink);
+	border-bottom-color: var(--ink);
+	font-weight: 500;
+}
+
+/* Visible focus ring for keyboard users, who cannot see the hidden input. */
+#t-about:focus-visible ~ main label[for="t-about"],
+#t-research:focus-visible ~ main label[for="t-research"],
+#t-projects:focus-visible ~ main label[for="t-projects"],
+#t-cv:focus-visible ~ main label[for="t-cv"] {
+	outline: 2px solid var(--ink);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+
+/* ── prose ──────────────────────────────────────────────────────────────── */
+
+p {
+	margin: 0 0 1.1rem;
+	color: var(--ink-soft);
+}
+
+.lead {
+	color: var(--ink);
+	font-size: 1.1rem;
+	line-height: 1.6;
+}
+
+strong {
+	color: var(--ink);
+	font-weight: 600;
 }
 
 h2 {
@@ -111,48 +195,86 @@ h2 {
 	border-bottom: 1px solid var(--rule);
 }
 
-p {
-	margin: 0 0 1.1rem;
-	color: var(--ink-soft);
+.placeholder {
+	font-size: 0.9rem;
+	color: var(--ink-quiet);
+	font-style: italic;
 }
 
-.lead {
-	color: var(--ink);
-	font-size: 1.1rem;
-	line-height: 1.6;
-}
+/* ── CV ─────────────────────────────────────────────────────────────────── */
 
-/* ── work entries ───────────────────────────────────────────────────────── */
-
-article {
-	margin: 0 0 2.25rem;
-}
-
-h3 {
-	font-size: 1rem;
+.cv-section {
+	font-size: 0.75rem;
 	font-weight: 600;
-	margin: 0 0 0.15rem;
+	text-transform: uppercase;
+	letter-spacing: 0.09em;
+	color: var(--ink-quiet);
+	margin: 2.5rem 0 1rem;
+	padding-bottom: 0.4rem;
+	border-bottom: 1px solid var(--rule);
+}
+
+.cv-section:first-of-type {
+	margin-top: 0;
+}
+
+.entry {
+	margin: 0 0 1.6rem;
+}
+
+.entry-head,
+.entry-sub {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 1rem;
+	margin: 0 0 0.2rem;
 	color: var(--ink);
 }
 
-/* The employer sits on the same line as the role on wide screens and wraps
-   underneath on narrow ones, without a media query doing the work. */
-.where {
-	font-weight: 400;
+.entry-sub {
+	color: var(--ink-soft);
+	font-size: 0.94rem;
+}
+
+.entry-meta {
 	color: var(--ink-quiet);
-}
-
-.where::before {
-	content: "· ";
-}
-
-.when {
 	font-size: 0.85rem;
-	color: var(--ink-quiet);
-	margin: 0 0 0.6rem;
+	white-space: nowrap;
+	flex-shrink: 0;
 }
 
-/* ── links ──────────────────────────────────────────────────────────────── */
+.entry ul {
+	margin: 0.5rem 0 0;
+	padding-left: 1.1rem;
+}
+
+.entry li {
+	color: var(--ink-soft);
+	margin-bottom: 0.4rem;
+	font-size: 0.95rem;
+}
+
+.skills {
+	margin: 0;
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.35rem 1.2rem;
+}
+
+.skills dt {
+	font-weight: 600;
+	color: var(--ink);
+	font-size: 0.9rem;
+}
+
+.skills dd {
+	margin: 0;
+	color: var(--ink-soft);
+	font-size: 0.9rem;
+}
+
+/* ── links & footer ─────────────────────────────────────────────────────── */
 
 a {
 	color: var(--link);
@@ -166,41 +288,61 @@ a:hover {
 	text-decoration-color: var(--link);
 }
 
-.email {
-	font-size: 1.05rem;
-	color: var(--ink);
-}
-
 .quiet {
 	font-size: 0.9rem;
 	color: var(--ink-quiet);
+	margin-top: 2rem;
 }
 
-/* ── footer ─────────────────────────────────────────────────────────────── */
-
 footer {
-	max-width: var(--measure);
-	margin: 0 auto;
-	padding: 2rem 1.5rem 4rem;
 	border-top: 1px solid var(--rule);
+	padding: 1.5rem 0 4rem;
 }
 
 footer p {
 	font-size: 0.85rem;
 	color: var(--ink-quiet);
-	margin: 1.5rem 0 0;
+	margin: 0;
 }
 
-@media (max-width: 480px) {
+/* ── narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
 	body {
 		font-size: 16px;
 	}
 
 	header {
 		margin: 2.5rem 0 2rem;
+		gap: 1.1rem;
+	}
+
+	.portrait {
+		width: 96px;
+		height: 96px;
 	}
 
 	h1 {
-		font-size: 1.7rem;
+		font-size: 1.6rem;
+	}
+
+	/* The date would otherwise squeeze the role into one character per line. */
+	.entry-head,
+	.entry-sub {
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+
+	.entry-meta {
+		white-space: normal;
+	}
+
+	.skills {
+		grid-template-columns: 1fr;
+		gap: 0 0;
+	}
+
+	.skills dd {
+		margin-bottom: 0.6rem;
 	}
 }
