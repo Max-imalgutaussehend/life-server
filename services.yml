@@ -86,13 +86,38 @@ services:
     access: private
     enabled: true # M9
 
-  # Hermes and OpenClaw are AGENT RUNTIMES, not web apps. Paperclip calls them
-  # over HTTP/SSE on the internal `agent` network; nothing outside the host ever
-  # needs to reach them. They are therefore deliberately NOT declared here —
-  # this registry generates PUBLIC routes, and a public route to an agent
-  # runtime would expose an endpoint that executes model-chosen code.
+  # Hermes is an AGENT RUNTIME, not a web app. Paperclip calls it over HTTP/SSE
+  # on the internal `agent` network; nothing outside the host ever needs to
+  # reach it. It is therefore deliberately NOT declared here — this registry
+  # generates PUBLIC routes, and a public route to an agent runtime would
+  # expose an endpoint that executes model-chosen code.
   #
-  # They are plain compose services on `agent` only. See ADR-0020.
+  # It is a plain compose service on `agent` only. See ADR-0020.
+
+  # ── openclaw — the exception to the paragraph above (M14, ADR-0022) ───────
+  # OpenClaw's gateway serves its own web chat ("OpenClaw Control") on 18789.
+  # The operator asked for a browser client because WhatsApp is too limited,
+  # and this is the one upstream ships — so it is routed rather than rebuilt.
+  #
+  # READ THIS BEFORE CHANGING `access`:
+  #   The UI answers 200 with NO credential. Verified, not assumed: the gateway
+  #   token guards the WebSocket, not the HTML. So Cloudflare Access is not a
+  #   convenience here, it is the ONLY thing between the public internet and an
+  #   agent that now runs with the full tool catalogue (M14) — file access,
+  #   shell, browser, the lot.
+  #
+  #   `access: private` on this entry is therefore load-bearing in a way it is
+  #   for no other service. Turning it public would publish a root shell with a
+  #   chat box in front of it.
+  #
+  # It stays on `agent` only: no Postgres, no Redis, no n8n (ADR-0004). Caddy
+  # reaches it across networks the same way it reaches every other app.
+  - name: openclaw
+    port: 18789
+    description: "OpenClaw Control — the agent's own web chat (M14)"
+    networks: [agent]
+    access: private
+    enabled: true # M14
 
   # ── THE ONLY PUBLIC SERVICE ON THIS HOST ──────────────────────────────────
   # A static portfolio on the bare domain. `access: public` is deliberate and

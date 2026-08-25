@@ -49,7 +49,13 @@ REGISTRY = REPO / "services.yml"
 TEMPLATES = REPO / "generator" / "templates"
 
 # Networks a service may join. Kept in sync with ADR-0004.
-VALID_NETWORKS = {"edge", "apps", "data"}
+#
+# `agent` was added in M9 (the fourth segment, where code-executing sessions
+# run) but never reached this list, because until M14 nothing on that network
+# had a public route and so nothing on it was ever declared in the registry.
+# openclaw is the first, and the omission surfaced exactly as ADR-0014 intends:
+# a loud generation error rather than a silently missing route.
+VALID_NETWORKS = {"edge", "apps", "data", "agent"}
 VALID_ACCESS = {"private", "public"}
 VALID_ENVS = {"prod", "dev"}
 NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")

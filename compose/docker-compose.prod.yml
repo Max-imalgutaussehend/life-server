@@ -115,6 +115,17 @@ services:
         aliases:
           - caddy
       apps: {}
+      # M14: Caddy also joins `agent`, to reach OpenClaw's own web chat.
+      #
+      # This is a deliberate widening of ADR-0004 and worth being precise
+      # about: it lets Caddy reach INTO the agent segment. It does NOT let the
+      # agent segment reach out — a container there still cannot open a socket
+      # to Postgres, Redis or n8n, which is what the segment exists to prevent.
+      #
+      # Caddy is a reverse proxy with no credentials of its own, so being on a
+      # third network costs little. The alternative — publishing OpenClaw's
+      # port on the host — would be far worse (ADR-0003).
+      agent: {}
     healthcheck:
       # /healthz is served by the generated Caddyfile.
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/healthz"]
