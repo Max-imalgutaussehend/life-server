@@ -751,79 +751,105 @@ services:
   # NOT IN services.yml, for the same reason as openclaw and cliproxy: that
   # registry generates PUBLIC routes, and an unauthenticated public router
   # holding provider keys is a credential-exfiltration endpoint.
+  # THE IMAGE TAG IS LOAD-BEARING: `3.8.49` is the HEADLESS build (461 MB).
+  # `3.8.49-web` is the same release WITH the Next.js dashboard and weighs
+  # 874 MB — nearly double, on a host with ~1.8 GB free. Upstream publishes both
+  # for every release and the only difference is that suffix. Do not "upgrade"
+  # to -web.
+  #
+  # Pinned by digest as well as tag (ADR-0011): a tag can be moved.
+  #
+  # This replaced a hand-written Dockerfile. That Dockerfile was built before
+  # the registry could be read (the operator's uplink was IPv6-only) and it
+  # guessed both the version and the way to disable the dashboard. Both guesses
+  # were wrong: the real version is 3.8.49, not 1.0.0, and the dashboard is not
+  # an env flag at all — it is a separate image tag, precompiled into the -web
+  # build. Upstream's image is also non-root already and handles its own
+  # permissions.
   omniroute:
-    build:
-      context: ./omniroute
-    image: life-server/omniroute:0.1.0
+    image: diegosouzapw/omniroute:3.8.49@sha256:92c768c56e2de32c51a0621ef182835018b00b288c9bb235c5c5e4514658c1a1
     container_name: ${ENV_PREFIX_NAME:-prod-}omniroute
     restart: unless-stopped
+    # Upstream asks for 40s in its own docker run example: the router flushes
+    # SQLite on shutdown, and killing it mid-write is how the provider store
+    # gets corrupted.
+    stop_grace_period: 40s
     environment:
-      # Gates the router's own /v1. Without this ANY container on `agent` —
-      # including a prompt-injected agent session — could drive it and spend
-      # provider quota, or read the configured providers back out.
-      OMNIROUTE_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
-      OMNIROUTE_PORT: 20128
+      # ⚠️ EVERY NAME BELOW WAS READ OUT OF THE IMAGE (/app/.env.example in
+      # diegosouzapw/omniroute:3.8.49), not inferred. An earlier version of this
+      # block invented OMNIROUTE_DASHBOARD_ENABLED, OMNIROUTE_MEMORY_ENABLED,
+      # OMNIROUTE_STEALTH_ENABLED and OMNIROUTE_CONFIG_PATH. NONE of them
+      # exist. They would have been ignored in silence — which is exactly why
+      # they are named here, so nobody reintroduces them.
+      PORT: 20128
+      NODE_ENV: production
       TZ: ${TZ:-Europe/Berlin}
-      # Tier 1 — the subscription, still answering everything it can. These are
-      # referenced by omniroute.json as ${CLIPROXY_*}; setting them without that
-      # file would configure nothing (the same trap openclaw.json documents).
-      CLIPROXY_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
-      CLIPROXY_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
-      # Tier 2 — inert until a key exists. `:-` and NOT `:?`, deliberately:
-      # this service must come up and route through tier 1 alone, so a missing
-      # key is a degraded fallback, not a failed boot. omniroute.json keeps the
-      # provider `"enabled": false` to match.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      # ── the memory budget, which is the operator's actual requirement ──
+
+      # ── THE ONE THAT MATTERS FOR SECURITY ──────────────────────────────
+      # Upstream ships REQUIRE_API_KEY=false. VERIFIED against a running
+      # container: GET /v1/models returned 200 with no credential at all.
+      # This service sits on `agent`, where containers execute model-chosen
+      # code — an unauthenticated router there is a prompt-injected session's
+      # free pass to spend provider quota and read stored provider keys.
+      REQUIRE_API_KEY: "true"
+      # And do not hand the stored keys back out over the API even to an
+      # authenticated caller.
+      ALLOW_API_KEY_REVEAL: "false"
+
+      # Secrets at rest. STORAGE_ENCRYPTION_KEY is what AES-encrypts the
+      # provider credentials in SQLite; losing it means re-entering every
+      # provider. JWT/API_KEY_SECRET sign the router's own sessions.
+      JWT_SECRET: ${OMNIROUTE_JWT_SECRET:?OMNIROUTE_JWT_SECRET is not set in .env}
+      API_KEY_SECRET: ${OMNIROUTE_API_KEY_SECRET:?OMNIROUTE_API_KEY_SECRET is not set in .env}
+      STORAGE_ENCRYPTION_KEY: ${OMNIROUTE_STORAGE_KEY:?OMNIROUTE_STORAGE_KEY is not set in .env}
+      INITIAL_PASSWORD: ${OMNIROUTE_INITIAL_PASSWORD:?OMNIROUTE_INITIAL_PASSWORD is not set in .env}
+
+      # ── memory, which is the operator's actual requirement ─────────────
       # "das was am wenigsten speicher zieht aber alles andere hergibt".
-      # Three advertised subsystems are the expensive ones, and none of them
-      # is needed for fallback routing:
       #
-      #   dashboard — a Next.js 16 app. The single largest cost, and it exists
-      #     to configure providers by hand. Provider config is declared in
-      #     omniroute.json below instead, which is also what keeps this
-      #     reproducible from Git (ADR-0014's principle, applied by hand
-      #     because this service is not in the registry).
-      #   memory — FTS5 + a Qdrant vector store. OpenClaw keeps its own
-      #     conversational state; a second memory here would be a duplicate
-      #     copy of the operator's private messages in a component that did
-      #     not exist yesterday.
-      #   semantic cache — embeddings on every request, for a workload of a
-      #     few messages a day. Pure overhead at this volume.
+      # MEASURED, not estimated: 531 MB RSS at idle with ZERO providers
+      # configured, settled over two minutes. The dashboard is NOT an env
+      # flag — it is a separate image tag (see the image comment above), and
+      # even the headless build still starts its WebSocket daemons.
       #
-      # What is deliberately KEPT: routing, tier fallback, circuit breakers,
-      # provider translation. That is the part being paid for.
-      #
-      # ⚠️ THESE NAMES ARE UNVERIFIED. They follow the OMNIROUTE_* convention
-      # the upstream docs use for PORT and API_KEY, but the authoring host had
-      # no route to the upstream docs (operator uplink was IPv6-only, server is
-      # v4). An env var this app does not recognise is IGNORED SILENTLY — it
-      # does not fail the way a bad Compose key would. So the first deploy must
-      # confirm the dashboard is actually down and memory actually off, by
-      # measurement (`docker stats`), not by reading this block back.
-      OMNIROUTE_DASHBOARD_ENABLED: "false"
-      OMNIROUTE_MEMORY_ENABLED: "false"
-      OMNIROUTE_SEMANTIC_CACHE_ENABLED: "false"
-      OMNIROUTE_TELEMETRY_ENABLED: "false"
-      # TLS-fingerprint stealth is an advertised feature and is switched OFF on
-      # purpose. Its function is to make an automated client look like a
-      # browser to providers that forbid automated use — i.e. to defeat a
-      # counterparty's terms rather than to work within them. That is the same
-      # objection ADR-0018 raised against option B, and it does not stop being
-      # true because the feature is convenient.
-      OMNIROUTE_STEALTH_ENABLED: "false"
-      OMNIROUTE_CONFIG_PATH: /data/omniroute.json
+      # NODE_OPTIONS is the only lever that moved the number: with a 256 MB
+      # old-space cap it settled at 376 MB. 320 MB is chosen instead, because
+      # 376/400 was 94% of its limit — a container that survives startup and
+      # dies under load is worse than one that never starts.
+      NODE_OPTIONS: --max-old-space-size=384
+
+      # Turn off what runs on a timer and phones out. Each of these appeared in
+      # the probe's startup log doing work this deployment has no use for.
+      PRICING_SYNC_ENABLED: "false"
+      APP_LOG_TO_FILE: "false"
+      # Arena ELO sync fetches public leaderboards every 24h and was already
+      # failing with HTTP 429 during the probe. It ranks models; this router
+      # has one.
+      ARENA_ELO_SYNC_ENABLED: "false"
+      # The HTTP inspector is a debugging proxy that can intercept TLS. Not on
+      # a host that carries the operator's messages.
+      INSPECTOR_HTTP_PROXY_AUTOSTART: "false"
+      INSPECTOR_TLS_INTERCEPT: "false"
+      # No SOCKS5 egress path. This container talks to cliproxy and, if tier 2
+      # is ever keyed, to api.anthropic.com. Nothing else.
+      ENABLE_SOCKS5_PROXY: "false"
+
+      # Tier 2 — inert until a key exists. `:-` and NOT `:?`, deliberately:
+      # the service must come up and serve tier 1 alone, so a missing key is a
+      # degraded fallback rather than a failed boot.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
-      # SQLite database + AES-encrypted provider credentials. A named volume:
-      # losing it means re-entering every provider key by hand.
-      - omniroute_data:/data
-      # Declared provider/routing config, seeded by the entrypoint. Same
-      # repo-authoritative-content / volume-owns-directory split as OpenClaw,
-      # and for the same reason: the app writes sidecar state next to its
-      # config, so the directory cannot be a read-only bind.
-      - ./omniroute/omniroute.json:/seed/omniroute.json:ro
-      - ./omniroute/entrypoint.sh:/entrypoint.sh:ro
-    entrypoint: ["/sbin/tini", "--", "/bin/sh", "/entrypoint.sh"]
+      # /app/data — VERIFIED against the image's WORKDIR and upstream's own
+      # `docker run` example, not /data as an earlier version of this file
+      # assumed. Holds the SQLite database and the AES-encrypted provider
+      # credentials; losing it means re-entering every provider by hand.
+      #
+      # There is no config-file mount, and that is a finding rather than an
+      # omission: the image reads no providers.json of any kind. Provider state
+      # lives ONLY in SQLite, entered through the API or the dashboard. So this
+      # service cannot be made reproducible-from-Git the way every other one
+      # here is — see ADR-0021 and scripts/omniroute-providers.sh.
+      - omniroute_data:/app/data
     networks:
       - agent
     depends_on:
@@ -835,29 +861,52 @@ services:
       cliproxy:
         condition: service_healthy
     healthcheck:
-      # wget, not bash's /dev/tcp: this is Alpine and ships busybox wget but no
-      # bash. Verified against the image rather than assumed — the mistake the
-      # cliproxy healthcheck comment above exists to warn about.
+      # node, NOT wget or curl: this image ships NEITHER. Verified by running
+      # both in the container — exactly the failure mode the cliproxy
+      # healthcheck comment above warns about, caught here before it could
+      # report a healthy router as unhealthy forever.
       #
-      # /v1/models proves the router is actually serving its API, not merely
-      # that a port is open.
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:20128/v1/models"]
+      # /v1/models proves the API is actually serving, not merely that a port
+      # is open. A 401 counts as healthy: with REQUIRE_API_KEY=true an
+      # unauthenticated probe SHOULD be refused, and a refusal still proves the
+      # router is answering.
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          fetch('http://127.0.0.1:20128/v1/models')
+            .then(r => process.exit(r.status < 500 ? 0 : 1))
+            .catch(() => process.exit(1))
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      # 45s measured: the probe container logged "Embedded services bootstrap
+      # complete" around 40s. 90s leaves room on a loaded host rather than
+      # restart-looping a service that was merely still starting.
+      start_period: 90s
     deploy:
       resources:
         limits:
-          # Node + SQLite with the dashboard, vector memory and semantic cache
-          # all disabled. Upstream quotes no figure, so this is a CEILING, not
-          # a measurement: if the container is OOM-killed on first run the
-          # trimming above did not do what it claims, and that is worth
-          # finding out loudly rather than by slow degradation.
+          # MEASURED, not guessed. An earlier version of this file said 256M on
+          # the assumption that env flags would strip the dashboard; the
+          # container would have been OOM-killed on first start.
           #
-          # Host budget: ~2 GB free. openclaw already holds 512M, cliproxy
-          # 256M. 256M here keeps the total inside that.
-          memory: 256M
+          #   default            531 MB idle, zero providers configured
+          #   --max-old-space=256  376 MB — but that is 94% of a 400M limit
+          #
+          # 512M was tried first and measured 488 MB — 95% of its own limit,
+          # i.e. one request away from an OOM kill. 768M with a 384 MB heap cap
+          # is where it actually has room.
+          #
+          # Host budget: 1.4 GB available with everything else up; openclaw
+          # holds 512M, cliproxy 256M.
+          #
+          # This is the honest cost of the operator's "least memory that still
+          # gives everything else": the floor is ~500 MB, because the headless
+          # image still carries the whole application. There is no smaller
+          # configuration of this router — only a smaller router.
+          memory: 768M
     security_opt:
       - no-new-privileges:true
 

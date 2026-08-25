@@ -2,21 +2,21 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "claude-subscription/claude-sonnet-5"
+        "primary": "omniroute/cliproxy/claude-sonnet-5"
       },
       "skills": []
     }
   },
   "models": {
     "providers": {
-      "claude-subscription": {
+      "omniroute": {
         "baseUrl": "${OPENAI_BASE_URL}",
         "apiKey": "${OPENAI_API_KEY}",
         "api": "openai-completions",
         "timeoutSeconds": 300,
         "models": [
           {
-            "id": "claude-sonnet-5",
+            "id": "cliproxy/claude-sonnet-5",
             "name": "Claude Sonnet 5",
             "reasoning": false,
             "input": [
@@ -46,7 +46,7 @@
     }
   },
   "messages": {
-    "responsePrefix": "🤖"
+    "responsePrefix": "\ud83e\udd16"
   },
   "tools": {
     "profile": "messaging",
