@@ -1,0 +1,189 @@
+#!/bin/bash
+# =============================================================================
+# hermes-profile — switch Hermes between the work proxy and the private router.
+# =============================================================================
+#
+# The counterpart to claude-profile, and deliberately the same shape: two
+# named profiles, one command, no arguments to remember.
+#
+# WHY IT IS NOT A STRAIGHT COPY OF claude-profile
+#   claude-profile swaps a whole settings.json, because Claude Code's two
+#   profiles differ in several places at once. Hermes differs in exactly three
+#   fields — provider, base_url, api_key — so this edits those in place and
+#   leaves the other ~200 lines of config.yaml (skills, agent settings, voice,
+#   cron) untouched. Swapping whole files here would mean maintaining two
+#   near-identical copies and losing every change made to whichever one is not
+#   currently active.
+#
+# THE TUNNEL, WHICH IS THE PART THAT IS NOT OBVIOUS
+#   The private profile points at the OmniRoute container on the life-server.
+#   That container publishes no host port — nothing web-facing does, because
+#   traffic is supposed to arrive through the Cloudflare tunnel (ADR-0003).
+#
+#   So `pro` opens an SSH port-forward first. This is not a way around the
+#   rule: it uses the SSH access the operator already has, it is authenticated
+#   by the same key, and it disappears when the tunnel is closed. No port is
+#   opened to the internet at any point.
+#
+# USAGE
+#   hermes-profile work    # SAP LiteLLM proxy on localhost:6655
+#   hermes-profile pro     # private OmniRoute, via an SSH tunnel
+#   hermes-profile status  # which profile is active, and is the tunnel up
+#   hermes-profile stop    # close the tunnel
+# =============================================================================
+set -euo pipefail
+
+CONFIG="$HOME/.hermes/config.yaml"
+
+# ── work: the SAP proxy ──────────────────────────────────────────────────────
+WORK_URL="http://localhost:6655/litellm/v1"
+WORK_MODEL="anthropic--claude-4.8-opus"
+
+# The work key is NOT stored here. This file is in Git (ADR-0006), and a
+# credential in it would be a credential in every clone and every diff.
+# It is read back out of the config's own custom_providers block, which is
+# where Hermes already keeps it — so switching to `work` and back is lossless
+# without this script ever holding the value.
+work_key() {
+	awk '/^custom_providers:/{f=1} f && /api_key:/{print $2; exit}' "$CONFIG"
+}
+
+# ── pro: the private router, reached through an SSH forward ──────────────────
+# 20128 is OmniRoute's port on the server; 20128 locally too, so the URL reads
+# the same on both sides.
+PRO_PORT=20128
+PRO_URL="http://localhost:${PRO_PORT}/v1"
+PRO_MODEL="cliproxy/claude-sonnet-5"
+
+SERVER="${SERVER:-deploy@62.238.4.64}"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/life-server}"
+REPO="${REPO:-$HOME/Documents/coding-projects/life-server}"
+TUNNEL_CTL="$HOME/.ssh/hermes-tunnel.sock"
+PREFIX="${ENV_PREFIX_NAME:-prod-}"
+
+[[ -f "$CONFIG" ]] || { echo "error: $CONFIG not found — is Hermes installed?" >&2; exit 1; }
+
+# Read the router's bearer from the repo's .env rather than hardcoding it here:
+# this file lives in ~/bin and is not the place for a credential.
+pro_key() {
+	if [[ -f "$REPO/.env" ]]; then
+		grep -E '^OMNIROUTE_API_KEY=' "$REPO/.env" | head -1 | cut -d= -f2-
+	fi
+}
+
+tunnel_up() {
+	[[ -S "$TUNNEL_CTL" ]] && ssh -O check -S "$TUNNEL_CTL" "$SERVER" 2>/dev/null
+}
+
+start_tunnel() {
+	if tunnel_up; then
+		echo "   tunnel: already open"
+		return 0
+	fi
+	# The forward targets the CONTAINER's address on the Docker network, not
+	# 127.0.0.1 on the host. Nothing listens on the host: the container
+	# publishes no port, because publishing one is exactly what ADR-0003
+	# forbids for anything reachable from outside.
+	#
+	# Resolved fresh on every start — a recreate can hand the container a
+	# different address, and a stale one fails as "connection reset by peer",
+	# which reads like a broken service rather than a stale route.
+	local ip
+	ip=$(ssh -i "$SSH_KEY" -o BatchMode=yes "$SERVER" \
+		"docker inspect ${PREFIX}omniroute --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'" 2>/dev/null | tr -d '[:space:]')
+	if [[ -z "$ip" ]]; then
+		echo "   tunnel: could not resolve ${PREFIX}omniroute — is the container up?" >&2
+		return 1
+	fi
+
+	# -f backgrounds it, -N runs no command, ControlMaster gives `stop` a
+	# handle to close it again later.
+	ssh -f -N \
+		-i "$SSH_KEY" \
+		-o ExitOnForwardFailure=yes \
+		-o ControlMaster=yes -S "$TUNNEL_CTL" \
+		-L "${PRO_PORT}:${ip}:${PRO_PORT}" \
+		"$SERVER" || {
+		echo "   tunnel: FAILED to open — is the server reachable?" >&2
+		return 1
+	}
+	echo "   tunnel: localhost:${PRO_PORT} -> ${SERVER} -> ${ip}:${PRO_PORT}"
+}
+
+stop_tunnel() {
+	if tunnel_up; then
+		ssh -O exit -S "$TUNNEL_CTL" "$SERVER" 2>/dev/null || true
+		echo "✅ Tunnel closed."
+	else
+		echo "   No tunnel open."
+	fi
+}
+
+# Rewrites only the fields under the top-level `model:` block. Anchored to that
+# block so the identical keys inside custom_providers are left alone — a blunt
+# sed would rewrite those too and quietly corrupt the provider list.
+set_model() { # url key default
+	python3 - "$CONFIG" "$1" "$2" "$3" <<'PY'
+import re, sys
+path, url, key, default = sys.argv[1:5]
+src = open(path).read()
+
+def patch(block: str) -> str:
+    block = re.sub(r'(?m)^(  base_url:).*$', r'\1 ' + url, block)
+    block = re.sub(r'(?m)^(  api_key:).*$',  r'\1 ' + key, block)
+    block = re.sub(r'(?m)^(  default:).*$',  r'\1 ' + default, block)
+    block = re.sub(r'(?m)^(  provider:).*$', r'\1 custom', block)
+    return block
+
+# The `model:` block runs until the next top-level key.
+m = re.search(r'(?ms)^model:\n(?:  .*\n|\n)*?(?=^\S)', src)
+if not m:
+    sys.exit("error: could not find the model: block in " + path)
+open(path, 'w').write(src[:m.start()] + patch(m.group(0)) + src[m.end():])
+PY
+}
+
+active_url() { sed -n '/^model:/,/^[^ ]/p' "$CONFIG" | grep -m1 '  base_url:' | awk '{print $2}'; }
+
+case "${1:-}" in
+work)
+	KEY="$(work_key)"
+	if [[ -z "$KEY" ]]; then
+		echo "error: no api_key under custom_providers in $CONFIG" >&2
+		exit 1
+	fi
+	set_model "$WORK_URL" "$KEY" "$WORK_MODEL"
+	echo "✅ Switched to WORK profile."
+	echo "   $WORK_URL"
+	if ! nc -z -G 2 localhost 6655 2>/dev/null; then
+		echo "   ⚠️  Nothing is listening on :6655 — start the SAP proxy first."
+	fi
+	;;
+pro)
+	KEY="$(pro_key)"
+	if [[ -z "$KEY" ]]; then
+		echo "error: OMNIROUTE_API_KEY not found in $REPO/.env" >&2
+		exit 1
+	fi
+	start_tunnel || exit 1
+	set_model "$PRO_URL" "$KEY" "$PRO_MODEL"
+	echo "✅ Switched to PRIVATE profile."
+	echo "   $PRO_URL  ($PRO_MODEL)"
+	;;
+status)
+	echo "config:   $CONFIG"
+	echo "base_url: $(active_url)"
+	if tunnel_up; then echo "tunnel:   open"; else echo "tunnel:   closed"; fi
+	;;
+stop)
+	stop_tunnel
+	;;
+*)
+	echo "Usage:"
+	echo "  hermes-profile work     # SAP LiteLLM proxy"
+	echo "  hermes-profile pro      # private OmniRoute, via SSH tunnel"
+	echo "  hermes-profile status"
+	echo "  hermes-profile stop     # close the tunnel"
+	exit 1
+	;;
+esac
