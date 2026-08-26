@@ -305,6 +305,17 @@ h2 {
 	color: var(--paper);
 }
 
+/* SAP's wordmark set in the page's own type, NOT the trademarked logo:
+   naming the organisation a project was published under is fair use, while
+   reproducing the mark on a personal site could imply endorsement. If an
+   official asset is ever added under img/, this can become an <img>. */
+.pub-tag-sap {
+	font-size: 0.82rem;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	padding-left: 0.66rem; /* offsets the trailing letter-spacing so it centres */
+}
+
 .pub-media img {
 	/* Square icon, not a wide screenshot: capped so it stays an icon rather
 	   than becoming a panel. */
