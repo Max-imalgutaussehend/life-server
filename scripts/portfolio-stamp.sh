@@ -28,7 +28,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SITE="$REPO/compose/portfolio/site"
 CSS="$SITE/style.css"
-PDF="$SITE/Max_Rommel_CV.pdf"
+PDF="$SITE/cv.pdf"
 HTML="$SITE/index.html"
 
 for f in "$CSS" "$PDF" "$HTML"; do
@@ -60,7 +60,7 @@ if n1 == 0:
 
 # The CV is replaced from time to time; without a stamp the edge would keep
 # serving the previous PDF under the same URL.
-new, n2 = re.subn(r'(?P<a>(?:href|data)="/Max_Rommel_CV\.pdf)(?:\?v=[^"]*)?"',
+new, n2 = re.subn(r'(?P<a>(?:href|data)="/cv\.pdf)(?:\?v=[^"]*)?"',
                   lambda m: f'{m.group("a")}?v={pdf_h}"', new)
 if n2 == 0:
     sys.exit("error: no CV reference found in " + path)
