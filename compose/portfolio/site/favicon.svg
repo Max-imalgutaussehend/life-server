@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!--
+    favicon.svg — maxrommel.de
+
+    An "M" drawn as three strokes rather than set in a typeface: two legs and
+    the descending middle. It reads as the initial at 32px and as a mark at
+    16px, where a real letterform's thin parts collapse into mush.
+
+    WHY SVG AND NOT .ICO
+      One file, every size, no rasterisation. Every browser this site will
+      realistically meet supports it.
+
+    WHY IT FOLLOWS THE COLOUR SCHEME
+      The page is theme-aware, so its icon is too: `currentColor` inherits
+      from the media query below, so the mark is dark on a light tab strip and
+      light on a dark one. A fixed colour would vanish into one of the two.
+  -->
+  <style>
+    path { stroke: #1a1a1a; }
+    @media (prefers-color-scheme: dark) { path { stroke: #e8e8e6; } }
+  </style>
+
+  <!--
+    Stroke, not fill: an 8-unit stroke stays visible when scaled to 16px.
+
+    The mark sits inside a 16-unit margin rather than filling the viewBox.
+    Browsers draw a favicon flush against the tab's edge, so a shape that
+    touches its own bounding box looks cramped next to every other tab.
+    Square caps and a mitred join keep the corners crisp at small sizes —
+    round ones read as blur.
+  -->
+  <!--
+    stroke is set TWICE on purpose. The presentation attribute is the floor:
+    if a browser refuses the <style> block above (some do, inside an icon
+    resource), currentColor inherits nothing and the mark renders invisible.
+    The attribute guarantees a visible dark mark; the stylesheet overrides it
+    to the light one when the tab strip is dark.
+  -->
+  <path d="M16 46 V22 L32 39 L48 22 V46"
+        fill="none"
+        stroke="#1a1a1a"
+        stroke-width="8"
+        stroke-linecap="square"
+        stroke-linejoin="miter" />
+</svg>
