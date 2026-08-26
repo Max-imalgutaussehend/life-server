@@ -1160,6 +1160,17 @@ services:
       #   before anything else.
       LM_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
 
+      # M15: the CEO agent could run but not look anything up — it reported
+      # "no API key is available in this environment" while trying to read the
+      # very issue it had been given. Paperclip drives Hermes, but never
+      # passed it a way back in.
+      #
+      # Same agent key OpenClaw uses: bound to the Chief of Staff agent,
+      # revocable on its own row, not the operator's login.
+      PAPERCLIP_URL: http://${ENV_PREFIX_NAME:-prod-}paperclip:3100
+      PAPERCLIP_AGENT_TOKEN: ${PAPERCLIP_AGENT_TOKEN:?PAPERCLIP_AGENT_TOKEN is not set in .env}
+      PAPERCLIP_COMPANY_ID: ${PAPERCLIP_COMPANY_ID:?PAPERCLIP_COMPANY_ID is not set in .env}
+
       # THE TOOL BUDGET IS LOAD-BEARING, and it is not stored here — it lives
       # in the hermes_data volume (`hermes tools disable ...`). Recorded here
       # because the failure it prevents is silent and expensive to re-diagnose.
