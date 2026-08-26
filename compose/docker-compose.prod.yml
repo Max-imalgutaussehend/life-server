@@ -1129,7 +1129,35 @@ services:
       # answers everything it can (ADR-0021).
       OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}omniroute:20128/v1
       OPENAI_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
-      LM_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}omniroute:20128/v1
+      # HERMES_LM_BASE_URL is an override hook, normally unset. It exists so a
+      # request recorder can be put in front of the router without editing this
+      # file — which is how the bug below was finally found.
+      LM_BASE_URL: ${HERMES_LM_BASE_URL:-http://${ENV_PREFIX_NAME:-prod-}omniroute:20128/v1}
+
+      # ⚠️ THE TOOLSET THAT MATTERS IS `api_server`, NOT `cli` (M15)
+      #   Paperclip's CEO agent ran into HTTP 400 "Third-party apps now draw
+      #   from your extra usage" on every single run. The cause was not the
+      #   prompt, the model, the routing or max_tokens — all four were ruled
+      #   out by replaying the captured request with each one changed.
+      #   Removing `tools` was the only edit that turned 400 into 200.
+      #
+      #   The trap: `hermes tools list` defaults to the `cli` platform, and
+      #   that is what the operator had configured — six toolsets, carefully
+      #   chosen. The gateway that Paperclip drives runs as `api_server`,
+      #   which had NO configuration at all, so it fell back to the full
+      #   default catalogue: 16 tools, ~45 KB of a 57 KB request.
+      #
+      #   The platform name appears nowhere in the config or the help text.
+      #   It came from an error message listing valid values after four wrong
+      #   guesses.
+      #
+      #   Fixed with `hermes tools disable --platform api_server ...`, which
+      #   writes to platform_toolsets.api_server in the hermes_data volume —
+      #   NOT to this repo. Measured after: 32,218 B, 9 tools, HTTP 200, and
+      #   a real agent turn with a tool call in it.
+      #
+      #   If this returns, check `hermes tools list --platform api_server`
+      #   before anything else.
       LM_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
 
       # THE TOOL BUDGET IS LOAD-BEARING, and it is not stored here — it lives
