@@ -49,9 +49,23 @@ hash_of() {
 CSS_HASH="$(hash_of "$CSS")"
 PDF_HASH="$(hash_of "$PDF")"
 
-python3 - "$CSS_HASH" "$PDF_HASH" "$HTML" "$HTML_DE" <<'PY'
+# Images are cached at the edge exactly like the stylesheet, and a replaced
+# icon under the same name stays invisible for as long as that entry lives.
+# Collected dynamically so a new image does not need a change here.
+IMG_ARGS=()
+if [[ -d "$SITE/img" ]]; then
+	for f in "$SITE/img"/*; do
+		[[ -f "$f" ]] || continue
+		IMG_ARGS+=("$(basename "$f")=$(hash_of "$f")")
+	done
+fi
+
+python3 - "$CSS_HASH" "$PDF_HASH" "$HTML" "$HTML_DE" "${IMG_ARGS[@]}" <<'PY'
 import re, sys
-css_h, pdf_h, paths = sys.argv[1], sys.argv[2], sys.argv[3:]
+css_h, pdf_h = sys.argv[1], sys.argv[2]
+rest = sys.argv[3:]
+paths = [a for a in rest if not re.match(r'^[^=]+=[0-9a-f]+$', a)]
+imgs = dict(a.split('=', 1) for a in rest if re.match(r'^[^=]+=[0-9a-f]+$', a))
 
 for path in paths:
   src = open(path).read()
@@ -68,6 +82,10 @@ for path in paths:
                     lambda m: f'{m.group("a")}?v={pdf_h}"', new)
   if n2 == 0:
       sys.exit("error: no CV reference found in " + path)
+
+  for name, h in imgs.items():
+      new = re.sub(r'(src="/img/' + re.escape(name) + r')(?:\?v=[^"]*)?"',
+                   lambda m: f'{m.group(1)}?v={h}"', new)
 
   if new != src:
       open(path, 'w').write(new)
