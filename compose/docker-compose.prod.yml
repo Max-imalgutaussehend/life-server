@@ -1295,6 +1295,21 @@ services:
       #
       #   If this returns, check `hermes tools list --platform api_server`
       #   before anything else.
+      #
+      # ⚠️ A 429 IS PER-MODEL, NOT PER-ACCOUNT (M17)
+      #   omniroute reports "all credentials for model X are cooling down" and
+      #   it means exactly that: X. Another model on the SAME credential keeps
+      #   answering 200 in the same second — measured, sonnet-4-6 429 while
+      #   sonnet-5 returned a completion.
+      #
+      #   The wording reads like the subscription is exhausted, and an agent
+      #   debugging its own outage concluded precisely that. It then set a
+      #   per-agent model override to the locked-out model while trying
+      #   alternatives, which made the failure permanent for that agent.
+      #
+      #   So: before concluding "quota gone", test a second model. And prefer
+      #   NO per-agent model override — the provider default is the one that
+      #   moves when a model is locked out.
       LM_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
 
       # M15: the CEO agent could run but not look anything up — it reported
