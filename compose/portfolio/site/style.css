@@ -271,6 +271,12 @@ a:hover {
 	margin: 3.5rem 0 0.75rem;
 }
 
+.contact-mail {
+	color: var(--ink);
+	display: inline-flex;
+	opacity: 0.9;
+}
+
 .contact a {
 	color: var(--ink);
 	display: inline-flex;
