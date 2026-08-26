@@ -1047,6 +1047,12 @@ services:
       # the OPENAI_* vars above exist only because it references them as
       # ${OPENAI_BASE_URL} / ${OPENAI_API_KEY}. Setting them without the file
       # would configure nothing.
+      # Telegram (M16). Staged but OFF: openclaw.json keeps the channel
+      # disabled until both of these have values, because a channel enabled
+      # with an empty token makes the gateway retry-loop against Telegram's
+      # API on every single start.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ALLOW_FROM: ${TELEGRAM_ALLOW_FROM:-}
       OPENCLAW_CONFIG_PATH: /config/openclaw.json
       TZ: ${TZ:-Europe/Berlin}
 

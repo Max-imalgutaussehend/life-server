@@ -42,6 +42,20 @@
         }
       },
       "defaultAccount": "default"
+    },
+    "telegram": {
+      "enabled": false,
+      "dmPolicy": "allowlist",
+      "allowFrom": [
+        "${TELEGRAM_ALLOW_FROM}"
+      ],
+      "groupPolicy": "disabled",
+      "accounts": {
+        "default": {
+          "enabled": false
+        }
+      },
+      "defaultAccount": "default"
     }
   },
   "messages": {
@@ -58,6 +72,9 @@
     "entries": {
       "whatsapp": {
         "enabled": true
+      },
+      "telegram": {
+        "enabled": false
       }
     }
   },
