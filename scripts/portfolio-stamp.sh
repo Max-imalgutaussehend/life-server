@@ -53,14 +53,14 @@ path, css_h, pdf_h = sys.argv[1], sys.argv[2], sys.argv[3]
 src = open(path).read()
 new = src
 
-new, n1 = re.subn(r'href="/style\.css(?:\?v=[0-9a-f]+)?"',
+new, n1 = re.subn(r'href="/style\.css(?:\?v=[^"]*)?"',
                   f'href="/style.css?v={css_h}"', new)
 if n1 == 0:
     sys.exit("error: no stylesheet link found in " + path)
 
 # The CV is replaced from time to time; without a stamp the edge would keep
 # serving the previous PDF under the same URL.
-new, n2 = re.subn(r'(?P<a>(?:href|data)="/Max_Rommel_CV\.pdf)(?:\?v=[0-9a-f]+)?"',
+new, n2 = re.subn(r'(?P<a>(?:href|data)="/Max_Rommel_CV\.pdf)(?:\?v=[^"]*)?"',
                   lambda m: f'{m.group("a")}?v={pdf_h}"', new)
 if n2 == 0:
     sys.exit("error: no CV reference found in " + path)

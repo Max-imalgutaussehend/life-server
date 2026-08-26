@@ -34,7 +34,18 @@ http://:8080 {
 	# the bandwidth saved by a long cache is meaningless, while the cost is real:
 	# Cloudflare extends whatever it is told (an hour here became four at the
 	# edge), so an edit stays invisible long enough to look like a broken deploy.
-	header Cache-Control "public, max-age=300"
+	@pdf path *.pdf
+	@nonpdf not path *.pdf
+
+	header @nonpdf Cache-Control "public, max-age=300"
+	# The PDF gets no shared cache. Its response headers are load-bearing —
+	# frame-ancestors decides whether the CV tab can embed it at all — and a
+	# cached copy carries the OLD headers with it. Cloudflare served
+	# `frame-ancestors 'none'` from cache long after the origin had switched
+	# to 'self', including on a REVALIDATE, which is what kept the CV tab
+	# showing its fallback. `no-cache` means revalidate every time; the file
+	# is 105 KB on a personal site, so the cost is nil.
+	header @pdf Cache-Control "no-cache"
 
 	# This host serves files and nothing else. These headers cost nothing and
 	# close the obvious classes of abuse for a page with no scripts at all.
@@ -48,9 +59,7 @@ http://:8080 {
 	# unmatched `header` still wins over an earlier matched one, which is why
 	# a `@pdf` override placed after the generic DENY silently did nothing.
 	# Both are matched instead, so neither can override the other.
-	@nonpdf not path *.pdf
 	header @nonpdf X-Frame-Options "DENY"
-	@pdf path *.pdf
 	header @pdf X-Frame-Options "SAMEORIGIN"
 	header Referrer-Policy "no-referrer"
 
@@ -63,7 +72,13 @@ http://:8080 {
 	# permits exactly one thing: a file served from this container. Historic
 	# object-src abuse was about Flash and remote plugins — neither is
 	# reachable from 'self' on a static file server with no scripts.
-	header Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; object-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	# frame-ancestors is split the same way X-Frame-Options is, and for the
+	# same reason — it was the second half of that bug. 'none' on the PDF says
+	# "nobody may embed me", INCLUDING our own CV tab, and a CSP
+	# frame-ancestors overrides X-Frame-Options where both are present. Fixing
+	# only X-Frame-Options therefore changed nothing visible.
+	header @nonpdf Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; object-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header @pdf Content-Security-Policy "default-src 'none'; frame-ancestors 'self'"
 
 	# Health endpoint for the container healthcheck and Uptime Kuma.
 	respond /healthz "ok" 200
