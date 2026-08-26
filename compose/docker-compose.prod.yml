@@ -1109,10 +1109,18 @@ services:
       # plus a settable base URL — the only built-in combination that matches
       # what the proxy actually speaks. Both pairs are kept: OPENAI_* for any
       # tool that reads the conventional names, LM_* for what Hermes uses.
-      OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
-      OPENAI_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
-      LM_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}cliproxy:8317/v1
-      LM_API_KEY: ${PROXY_API_KEY:?PROXY_API_KEY is not set in .env}
+      # M15: through the ROUTER, not cliproxy directly — the same change that
+      # brought OpenClaw back. Paperclip's CEO agent runs on Hermes, so the
+      # subscription's token ceiling hit it too: a run failed with HTTP 400
+      # "Third-party apps now draw from your extra usage", which is the
+      # misleading wording that ceiling always produces.
+      #
+      # cliproxy is not bypassed; it is tier 1 inside omniroute and still
+      # answers everything it can (ADR-0021).
+      OPENAI_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}omniroute:20128/v1
+      OPENAI_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
+      LM_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}omniroute:20128/v1
+      LM_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
 
       # THE TOOL BUDGET IS LOAD-BEARING, and it is not stored here — it lives
       # in the hermes_data volume (`hermes tools disable ...`). Recorded here
@@ -1158,7 +1166,9 @@ services:
     networks:
       - agent
     depends_on:
-      cliproxy:
+      # The router, not cliproxy (M15) — Hermes talks to omniroute now, and
+      # omniroute itself waits for cliproxy, so this covers the whole chain.
+      omniroute:
         condition: service_healthy
     healthcheck:
       # Hermes had NO healthcheck until M11's deploy, and that is exactly how it
