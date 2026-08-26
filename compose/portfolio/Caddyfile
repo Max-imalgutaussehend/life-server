@@ -30,7 +30,11 @@ http://:8080 {
 
 	# The site is static and rebuilt only on deploy, so a long cache is safe
 	# and keeps repeat visits off the origin entirely.
-	header Cache-Control "public, max-age=3600"
+	# Five minutes, not an hour. This is three small files on a personal site —
+	# the bandwidth saved by a long cache is meaningless, while the cost is real:
+	# Cloudflare extends whatever it is told (an hour here became four at the
+	# edge), so an edit stays invisible long enough to look like a broken deploy.
+	header Cache-Control "public, max-age=300"
 
 	# This host serves files and nothing else. These headers cost nothing and
 	# close the obvious classes of abuse for a page with no scripts at all.

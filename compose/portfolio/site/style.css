@@ -25,6 +25,7 @@
 	--paper: #fdfdfc;
 	--rule: #e4e4e7;
 	--link: #1a1a1a;
+	--accent: #2563eb;
 	--measure: 56rem;
 }
 
@@ -36,6 +37,7 @@
 		--paper: #141414;
 		--rule: #2a2a2a;
 		--link: #e8e8e6;
+		--accent: #6ba3f5;
 	}
 }
 
@@ -293,15 +295,41 @@ h2 {
 /* ── links & footer ─────────────────────────────────────────────────────── */
 
 a {
-	color: var(--link);
-	text-decoration: underline;
-	text-underline-offset: 3px;
-	text-decoration-thickness: 1px;
-	text-decoration-color: var(--rule);
+	color: var(--accent);
+	text-decoration: none;
 }
 
 a:hover {
-	text-decoration-color: var(--link);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+/* ── contact row ────────────────────────────────────────────────────────── */
+
+.contact {
+	display: flex;
+	justify-content: center;
+	gap: 1.6rem;
+	margin: 3.5rem 0 0.75rem;
+}
+
+.contact a {
+	color: var(--ink);
+	display: inline-flex;
+	opacity: 0.9;
+	transition: opacity 0.15s ease;
+}
+
+.contact a:hover {
+	opacity: 1;
+	text-decoration: none;
+}
+
+.contact-note {
+	text-align: center;
+	font-size: 0.9rem;
+	color: var(--ink-quiet);
+	margin: 0;
 }
 
 .quiet {
