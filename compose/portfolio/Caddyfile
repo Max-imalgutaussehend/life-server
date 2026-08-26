@@ -41,7 +41,12 @@ http://:8080 {
 	header X-Content-Type-Options "nosniff"
 	header X-Frame-Options "DENY"
 	header Referrer-Policy "no-referrer"
-	header Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	# object-src 'self' is the one loosening of default-src 'none', and it is
+	# what lets the CV tab embed its own PDF. Scoped to same-origin, so it
+	# permits exactly one thing: a file served from this container. Historic
+	# object-src abuse was about Flash and remote plugins — neither is
+	# reachable from 'self' on a static file server with no scripts.
+	header Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; object-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 	# Health endpoint for the container healthcheck and Uptime Kuma.
 	respond /healthz "ok" 200

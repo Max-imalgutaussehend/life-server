@@ -229,120 +229,24 @@ h2 {
 	font-style: italic;
 }
 
-/* ── CV, rendered in the shape of the PDF ───────────────────────────────── */
+/* ── CV, embedded as the PDF itself ─────────────────────────────────────── */
 
-.resume-name {
-	font-size: 1.5rem;
-	font-weight: 700;
-	color: var(--ink);
-	text-transform: none;
-	letter-spacing: -0.01em;
-	border: 0;
-	margin: 0 0 0.2rem;
-	padding: 0;
+.cv-embed {
+	width: 100%;
+	/* Tall enough that a page of A4 is legible without scrolling inside the
+	   frame on a laptop; the viewport caps it on anything shorter. */
+	height: min(80vh, 1000px);
+	border: 1px solid var(--rule);
+	border-radius: 4px;
+	background: var(--paper);
 }
 
-.resume-contact {
-	font-size: 0.88rem;
-	color: var(--ink-soft);
-	margin: 0 0 0.4rem;
-	padding-bottom: 0.6rem;
-	border-bottom: 2px solid var(--ink);
+.cv-embed p {
+	padding: 1.5rem;
 }
 
-/* Section headings: small caps over a rule, as in the document. */
-.rs {
-	font-size: 0.78rem;
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.07em;
-	color: var(--ink);
-	margin: 1.6rem 0 0.7rem;
-	padding-bottom: 0.25rem;
-	border-bottom: 1px solid var(--ink);
-}
-
-.re {
-	margin: 0 0 1.2rem;
-}
-
-/* Organisation left, date right — the layout that makes a CV scannable. */
-.re-top,
-.re-mid {
-	display: flex;
-	justify-content: space-between;
-	align-items: baseline;
-	gap: 1.5rem;
-	margin: 0;
-	font-size: 0.94rem;
-}
-
-.re-org {
-	font-weight: 700;
-	color: var(--ink);
-	text-decoration: underline;
-	text-underline-offset: 3px;
-	text-decoration-thickness: 1px;
-}
-
-.re-mid {
-	color: var(--ink-soft);
-}
-
-.re-mid em {
-	font-style: italic;
-}
-
-/* A rotation inside a role: indented so the hierarchy is visible. */
-.re-sub {
-	margin-top: 0.8rem;
-}
-
-.re-date,
-.re-place {
-	color: var(--ink);
-	font-size: 0.88rem;
-	white-space: nowrap;
-	flex-shrink: 0;
-}
-
-.re-top .re-date {
-	font-weight: 700;
-}
-
-.re-place {
-	font-style: italic;
-	color: var(--ink-soft);
-}
-
-.re ul {
-	margin: 0.35rem 0 0;
-	padding-left: 1.1rem;
-}
-
-.re li {
-	color: var(--ink-soft);
-	margin-bottom: 0.25rem;
-	font-size: 0.92rem;
-	line-height: 1.5;
-}
-
-.skills {
-	margin: 0.3rem 0 0;
-	display: grid;
-	grid-template-columns: auto 1fr;
-	gap: 0.35rem 1.2rem;
-}
-
-.skills dt {
-	font-weight: 600;
-	color: var(--ink);
-	font-size: 0.9rem;
-}
-
-.skills dd {
-	margin: 0;
-	color: var(--ink-soft);
+.cv-link {
+	margin-top: 1rem;
 	font-size: 0.9rem;
 }
 
@@ -435,29 +339,9 @@ footer p {
 		font-size: 2rem;
 	}
 
-	/* The date would otherwise squeeze the role into one character per line. */
-	.re-top,
-	.re-mid {
-		flex-direction: column;
-		gap: 0.05rem;
-	}
-
-	.re-date,
-	.re-place {
-		white-space: normal;
-	}
-
 	/* The name may wrap on a phone — there is no room not to. */
 	header h1 {
 		white-space: normal;
 	}
 
-	.skills {
-		grid-template-columns: 1fr;
-		gap: 0 0;
-	}
-
-	.skills dd {
-		margin-bottom: 0.6rem;
-	}
 }
