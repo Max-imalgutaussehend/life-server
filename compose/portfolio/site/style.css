@@ -25,7 +25,7 @@
 	--paper: #fdfdfc;
 	--rule: #e4e4e7;
 	--link: #1a1a1a;
-	--measure: 38rem;
+	--measure: 56rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -69,27 +69,43 @@ main {
 /* ── header ─────────────────────────────────────────────────────────────── */
 
 header {
+	margin: 4rem 0 2rem;
+}
+
+/* Light weight overall, bold on the first name only — the reference does the
+   same, and it reads as a name rather than a banner. */
+h1 {
+	font-size: 2.6rem;
+	font-weight: 300;
+	letter-spacing: -0.02em;
+	margin: 0 0 0.5rem;
+}
+
+h1 strong {
+	font-weight: 700;
+}
+
+/* Text left, portrait right. The image comes LAST in the markup so a screen
+   reader and a narrow viewport both reach the prose first. */
+.split {
 	display: flex;
-	align-items: center;
-	gap: 1.5rem;
-	margin: 4rem 0 2.5rem;
+	gap: 3rem;
+	align-items: flex-start;
+}
+
+.split-text {
+	flex: 1;
+	min-width: 0;
 }
 
 .portrait {
-	width: 140px;
-	height: 140px;
-	border-radius: 50%;
+	width: 280px;
+	height: 280px;
 	object-fit: cover;
 	flex-shrink: 0;
-	/* The source is 560px for a 140px slot: 4x, so it stays sharp on retina
-	   and when the browser zooms. */
-}
-
-h1 {
-	font-size: 2rem;
-	font-weight: 600;
-	letter-spacing: -0.02em;
-	margin: 0 0 0.4rem;
+	/* Square, not round: the reference frames the photo, and a 560px source
+	   into a 280px slot is 2x, so it stays sharp on retina. */
+	border-radius: 4px;
 }
 
 .tagline {
@@ -307,23 +323,34 @@ footer p {
 
 /* ── narrow screens ─────────────────────────────────────────────────────── */
 
+/* Layout breakpoint: 56rem of prose plus a 280px portrait stops fitting
+   around here, well before the type itself needs to change. */
+@media (max-width: 820px) {
+	/* Portrait drops under the text rather than squeezing it. */
+	.split {
+		flex-direction: column;
+		gap: 2rem;
+	}
+
+	.portrait {
+		width: 100%;
+		height: auto;
+		max-width: 280px;
+		aspect-ratio: 1;
+	}
+}
+
 @media (max-width: 560px) {
 	body {
 		font-size: 16px;
 	}
 
 	header {
-		margin: 2.5rem 0 2rem;
-		gap: 1.1rem;
-	}
-
-	.portrait {
-		width: 96px;
-		height: 96px;
+		margin: 2.5rem 0 1.5rem;
 	}
 
 	h1 {
-		font-size: 1.6rem;
+		font-size: 2rem;
 	}
 
 	/* The date would otherwise squeeze the role into one character per line. */
