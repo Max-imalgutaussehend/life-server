@@ -71,6 +71,9 @@
       "allowedOrigins": [
         "https://openclaw.maxrommel.de"
       ]
-    }
+    },
+    "trustedProxies": [
+      "172.20.3.0/24"
+    ]
   }
 }
