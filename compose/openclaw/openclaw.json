@@ -44,7 +44,7 @@
       "defaultAccount": "default"
     },
     "telegram": {
-      "enabled": false,
+      "enabled": true,
       "dmPolicy": "allowlist",
       "allowFrom": [
         "${TELEGRAM_ALLOW_FROM}"
@@ -52,7 +52,7 @@
       "groupPolicy": "disabled",
       "accounts": {
         "default": {
-          "enabled": false
+          "enabled": true
         }
       },
       "defaultAccount": "default"
@@ -74,7 +74,7 @@
         "enabled": true
       },
       "telegram": {
-        "enabled": false
+        "enabled": true
       }
     }
   },
