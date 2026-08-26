@@ -573,6 +573,13 @@ services:
       # hostname, so login redirects and invite links would point at
       # prod-paperclip:3100 — a name that resolves only inside Docker.
       BETTER_AUTH_URL: https://paperclip.${DOMAIN:?DOMAIN is not set in .env}
+      # M15: Paperclip rejects requests whose Host header it does not know,
+      # even with a valid agent API key — the check runs before auth. OpenClaw
+      # reaches it by container name on the agent network, so that name has to
+      # be listed here or every call comes back 403 with a misleading message
+      # about a CLI command that needs a config file this deployment has not
+      # got.
+      PAPERCLIP_ALLOWED_HOSTNAMES: paperclip.${DOMAIN},${ENV_PREFIX_NAME:-prod-}paperclip,localhost
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       # PAPERCLIP_HOME. Not optional, and not obvious: the container ran for
@@ -935,7 +942,12 @@ services:
   # unauthenticated RCE endpoint. WhatsApp connectivity is a QR-paired outbound
   # session, so no inbound route is needed for it to work.
   openclaw:
-    image: openclaw/openclaw:2026.7.1-slim
+    # Built, not pulled (M15): upstream's image has no Docker client, so the
+    # mounted socket below would be an unusable file. See ./openclaw/Dockerfile
+    # — it adds the client on top of the same pinned upstream tag.
+    build:
+      context: ./openclaw
+    image: life-server/openclaw:2026.7.1-tools
     container_name: ${ENV_PREFIX_NAME:-prod-}openclaw
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
@@ -975,6 +987,31 @@ services:
       # would configure nothing.
       OPENCLAW_CONFIG_PATH: /config/openclaw.json
       TZ: ${TZ:-Europe/Berlin}
+
+      # ── credentials for the services the agent works with (M15) ─────────
+      # These are what turn "can reach it over the network" into "can do
+      # something with it". Passed as env rather than written into the config
+      # file, so they never land in the seeded /config/openclaw.json.
+      #
+      # Paperclip: an agent API key bound to the Chief of Staff agent. Scoped
+      # to that agent by Paperclip itself, and revocable by setting
+      # revoked_at on its row — which is why it exists instead of the
+      # operator's own login.
+      PAPERCLIP_URL: http://${ENV_PREFIX_NAME:-prod-}paperclip:3100
+      PAPERCLIP_AGENT_TOKEN: ${PAPERCLIP_AGENT_TOKEN:?PAPERCLIP_AGENT_TOKEN is not set in .env}
+      # Every Paperclip REST path is company-scoped:
+      # /api/companies/<id>/issues. Without this the agent gets a 400 telling
+      # it so, which costs it a round trip to discover.
+      PAPERCLIP_COMPANY_ID: ${PAPERCLIP_COMPANY_ID:?PAPERCLIP_COMPANY_ID is not set in .env}
+
+      # n8n: `:-` not `:?`, deliberately. n8n mints this in its own UI and
+      # shows it once; an empty value must degrade to "cannot build
+      # workflows", not to a container that refuses to start.
+      #
+      # n8n is NOT on the agent network, so this goes through Caddy by
+      # hostname — the same path a browser takes.
+      N8N_URL: https://n8n.${DOMAIN:?DOMAIN is not set in .env}
+      N8N_API_KEY: ${N8N_API_KEY:-}
     volumes:
       # /config is a WRITABLE volume, not a read-only bind, and that is a
       # deliberate reversal. OpenClaw treats this directory as its own: it
@@ -997,6 +1034,30 @@ services:
       # /root would have persisted an empty directory while the real pairing
       # lived in the container layer and vanished on every recreate.
       - openclaw_data:/home/node/.openclaw
+
+      # ── FULL HOST ACCESS (M15, ADR-0023) ────────────────────────────────
+      # The operator asked for an agent that can build and deploy services on
+      # this host, was shown what that means, and confirmed it.
+      #
+      # THIS IS ROOT ON THE HOST. Not "close to root" — the Docker socket
+      # lets any client start a container with / mounted, which is the
+      # standard privilege-escalation path. Every guarantee ADR-0004 and M9
+      # make about the `agent` sandbox is void for this container: it can
+      # reach prod-postgres, read .env, and stop anything running here.
+      #
+      # ADR-0023 records the decision and the reasoning. Do not copy this
+      # mount to another service without reading it.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Where the agent builds. A named volume rather than a bind into the
+      # repo, so its output cannot silently rewrite the deployment source of
+      # truth (ADR-0014) — what it builds lives beside the stack, not inside
+      # the definition of the stack.
+      - openclaw_workspace:/workspace
+    # The socket is root:docker 0660 on the host. `node` is not in that group
+    # inside the container, so the GID is added explicitly — 988 is this
+    # host's docker group, read from getent, not assumed.
+    group_add:
+      - "988"
     networks:
       - agent
     depends_on:
@@ -1141,6 +1202,11 @@ volumes:
   # takes a lock file beside the config and installs plugins beneath it.
   openclaw_config:
     name: ${ENV_PREFIX_NAME:-prod-}openclaw-config
+
+  # The agent's own build directory (M15). Separate from openclaw_data so a
+  # reset of the assistant's state does not throw away work it has built.
+  openclaw_workspace:
+    name: ${ENV_PREFIX_NAME:-prod-}openclaw-workspace
 
   # OmniRoute's SQLite database and AES-encrypted provider credentials, plus
   # the seeded config. Persistent because losing it means re-entering every
