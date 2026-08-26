@@ -938,6 +938,58 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ── notify — the one-way courier from agents to the operator (M16) ────────
+  # The CEO agent can read the board but had no way to reach a human between
+  # runs. This gives it exactly one outbound capability and nothing else.
+  #
+  # IT HOLDS THE DOCKER SOCKET, and that is the whole point of it existing:
+  # sending through OpenClaw requires `docker exec`, and giving that to Hermes
+  # would have made a SECOND container with host root — one that processes
+  # tickets typed into a web UI. This holds the capability instead, behind a
+  # ~100-line script that never executes model-chosen code.
+  #
+  # Same justification as cliproxy-heartbeat, the only other container trusted
+  # with something it could misuse: it is a courier, not an agent.
+  notify:
+    # Built: no published image has both the Docker CLI and a Python
+    # interpreter. Verified by running docker:29-cli — it has no python3.
+    build:
+      context: ./notify
+    image: life-server/notify:1.0.0
+    container_name: ${ENV_PREFIX_NAME:-prod-}notify
+    restart: unless-stopped
+    entrypoint: ["python3", "/app/notify.py"]
+    environment:
+      # The recipient is configuration, never request input — an agent that
+      # could choose the number could message anyone.
+      OPERATOR_WHATSAPP: ${OPERATOR_WHATSAPP:?OPERATOR_WHATSAPP is not set in .env}
+      OPENCLAW_CONTAINER: ${ENV_PREFIX_NAME:-prod-}openclaw
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./notify/notify.py:/app/notify.py:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "988"
+    networks:
+      - agent
+    depends_on:
+      openclaw:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8099/healthz',timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          # A stdlib HTTP server that shells out. Generous at this size.
+          memory: 64M
+    security_opt:
+      - no-new-privileges:true
+
   # ── openclaw — the personal assistant ─────────────────────────────────────
   # Point of contact #1: the operator talks to this on WhatsApp, and it talks to
   # Paperclip. Paperclip reaches it through the built-in `openclaw_gateway`
