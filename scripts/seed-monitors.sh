@@ -105,6 +105,30 @@ const monitors = [
   // 3900s ≈ 65 min against an hourly heartbeat: one missed report is tolerated
   // (a restart), two is an alert.
   { name: "cliproxy", type: "push", interval: 3900 },
+
+  // ── M17: the services that were running unwatched ────────────────────────
+  // The dashboard made the gap obvious — six monitors against fifteen
+  // containers, and the ones missing were not the unimportant ones.
+  //
+  // omniroute is the clearest case: every agent turn in the system goes
+  // through it since M13. It had no monitor at all, so an outage there would
+  // have looked like "the agents have gone quiet" with no way to tell why.
+  //
+  // Reachable because Kuma is on `apps` and these expose HTTP there. openclaw
+  // and hermes are deliberately NOT here: they sit on `agent` only, and
+  // widening Kuma into that segment is exactly what the cliproxy push monitor
+  // above exists to avoid. Their health is visible through the runs they
+  // produce, on the dashboard.
+  { name: "omniroute", url: "http://" + process.env.PREFIX + "omniroute:20128/v1/models" },
+  { name: "portfolio", url: "http://" + process.env.PREFIX + "portfolio:8080/healthz" },
+  { name: "dashboard", url: "http://" + process.env.PREFIX + "dashboard:8090/healthz" },
+  // postgres and redis are NOT here on purpose. They sit on `data`
+  // (internal: true) and Kuma sits on `apps`, so it cannot reach them at all
+  // — a monitor would report a permanent outage for two healthy databases.
+  // Joining Kuma to `data` to fix that would hand the container that holds
+  // the ntfy publish token a route to the databases, which is a worse trade
+  // than not graphing them. Their health shows up through the services that
+  // depend on them.
 ];
 
 const fail = (m) => { console.error("  ERROR: " + m); process.exit(1); };

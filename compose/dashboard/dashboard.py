@@ -212,15 +212,90 @@ def paperclip_data():
         "recent": q("""
             select left(coalesce(a.name, '?'), 20), r.status,
                    to_char(r.created_at, 'DD.MM HH24:MI'),
-                   left(coalesce(r.error, ''), 70)
+                   left(coalesce(r.error, ''), 70),
+                   r.id, coalesce(a.id::text, '')
               from heartbeat_runs r
               left join agents a on a.id = r.agent_id
-             order by r.created_at desc limit 8
+             order by r.created_at desc limit 12
+        """),
+        # Open tickets with their key, so each row can link into Paperclip.
+        "open_issues": q("""
+            select coalesce(identifier, 'MAX-' || issue_number::text), left(title, 60),
+                   status, priority, to_char(updated_at, 'DD.MM HH24:MI'), id::text
+              from issues
+             where status not in ('done', 'cancelled', 'closed')
+             order by updated_at desc limit 12
+        """),
+        # Seven days of run outcomes, one row per day: a trend, not a total.
+        "runs_by_day": q("""
+            select to_char(d.day, 'DD.MM'),
+                   count(r.id) filter (where r.status in ('succeeded','success','completed')),
+                   count(r.id) filter (where r.status not in ('succeeded','success','completed'))
+              from generate_series(current_date - 6, current_date, interval '1 day') d(day)
+              left join heartbeat_runs r on r.created_at::date = d.day
+             group by d.day order by d.day
         """),
     }
 
 
 # ── rendering ───────────────────────────────────────────────────────────────
+
+# ── charts ──────────────────────────────────────────────────────────────────
+# Inline SVG, no chart library. The CSP on this host forbids external origins
+# and a self-hosted library would be ~200 KB of dependency for what these
+# three shapes need. `currentColor` and CSS variables keep them theme-aware
+# without a second palette.
+
+PALETTE = ["var(--ok)", "var(--crit)", "var(--warn)", "var(--accent)", "var(--quiet)"]
+
+
+def donut(pairs, size=132):
+    """pairs: [(label, count)] — a ring, because a bare number hides the split."""
+    total = sum(c for _, c in pairs) or 1
+    r, cx = size / 2 - 12, size / 2
+    circ = 2 * 3.14159265 * r
+    out, offset = [], 0.0
+    for i, (label, count) in enumerate(pairs):
+        frac = count / total
+        colour = PALETTE[i % len(PALETTE)]
+        out.append(
+            f'<circle cx="{cx}" cy="{cx}" r="{r}" fill="none" stroke="{colour}" '
+            f'stroke-width="14" stroke-dasharray="{circ * frac:.2f} {circ:.2f}" '
+            f'stroke-dashoffset="{-offset:.2f}" transform="rotate(-90 {cx} {cx})">'
+            f'<title>{esc(label)}: {count}</title></circle>')
+        offset += circ * frac
+    biggest = max(pairs, key=lambda x: x[1]) if pairs else ("", 0)
+    pct = round(biggest[1] / total * 100)
+    legend = "".join(
+        f'<li><span class="swatch" style="background:{PALETTE[i % len(PALETTE)]}"></span>'
+        f'{esc(l)} <b>{c}</b></li>' for i, (l, c) in enumerate(pairs))
+    return (f'<div class="chart"><svg viewBox="0 0 {size} {size}" width="{size}" height="{size}">'
+            f'{"".join(out)}'
+            f'<text x="{cx}" y="{cx - 2}" text-anchor="middle" class="donut-n">{pct}%</text>'
+            f'<text x="{cx}" y="{cx + 14}" text-anchor="middle" class="donut-l">{esc(biggest[0])[:9]}</text>'
+            f'</svg><ul class="legend">{legend}</ul></div>')
+
+
+def sparkbars(values, labels, height=64):
+    """A day-by-day column chart. Bare counts hide trend; this shows it."""
+    if not values:
+        return '<p class="quiet">Keine Daten.</p>'
+    peak = max(values) or 1
+    w, gap = 26, 6
+    cols = []
+    for i, (v, lab) in enumerate(zip(values, labels)):
+        h = max(2, round(v / peak * height))
+        x = i * (w + gap)
+        cols.append(
+            f'<rect x="{x}" y="{height - h}" width="{w}" height="{h}" rx="2" '
+            f'fill="var(--accent)"><title>{esc(lab)}: {v}</title></rect>'
+            f'<text x="{x + w / 2}" y="{height + 13}" text-anchor="middle" '
+            f'class="axis">{esc(lab)}</text>')
+    total_w = len(values) * (w + gap)
+    return (f'<svg class="bars" viewBox="0 0 {total_w} {height + 18}" '
+            f'width="100%" height="{height + 18}" preserveAspectRatio="xMinYMid meet">'
+            f'{"".join(cols)}</svg>')
+
 
 def bar(pct, warn=75, crit=90):
     cls = "ok" if pct < warn else ("warn" if pct < crit else "crit")
@@ -313,49 +388,97 @@ def render_paperclip():
     try:
         d = paperclip_data()
     except Exception as e:
-        return failed("Agenten", str(e)), failed("Kennzahlen", str(e))
+        return (failed("Agenten", str(e)), failed("Tickets", str(e)),
+                failed("Kennzahlen", str(e)))
 
+    base = os.environ.get("PAPERCLIP_PUBLIC_URL", "").rstrip("/")
+
+    # ── agents ──────────────────────────────────────────────────────────────
     rows = []
     for name, role, status, adapter, subs in d["agents"]:
         cls = {"idle": "up", "running": "up", "error": "down",
                "paused": "unknown"}.get(status, "unknown")
         kind = "Manager" if int(subs or 0) > 0 else "Arbeiter"
-        rows.append(f'<tr><td><span class="dot {cls}"></span>{esc(name)}</td>'
+        cell = esc(name)
+        if base:
+            cell = f'<a href="{base}/agents">{cell}</a>'
+        rows.append(f'<tr><td><span class="dot {cls}"></span>{cell}</td>'
                     f'<td class="mono">{esc(status)}</td><td class="mono">{kind}</td>'
                     f'<td class="mono sub">{esc(adapter)}</td></tr>')
-    agents = ('<table><thead><tr><th>Agent</th><th>Status</th><th>Rolle</th>'
-              '<th>Adapter</th></tr></thead><tbody>' + "".join(rows) + "</tbody></table>")
+    agent_states = {}
+    for _, _, status, _, _ in d["agents"]:
+        agent_states[status] = agent_states.get(status, 0) + 1
+    agents = (f'<div class="split">'
+              f'<div class="grow"><table><thead><tr><th>Agent</th><th>Status</th>'
+              f'<th>Rolle</th><th>Adapter</th></tr></thead><tbody>'
+              + "".join(rows) + '</tbody></table></div>'
+              + donut(sorted(agent_states.items(), key=lambda x: -x[1]))
+              + '</div>')
 
-    def chips(pairs, empty):
-        if not pairs:
-            return f'<p class="quiet">{empty}</p>'
-        return '<div class="chips">' + "".join(
-            f'<span class="chip"><b>{esc(c)}</b> {esc(s)}</span>' for s, c in pairs) + "</div>"
+    # ── tickets, one row per open issue ─────────────────────────────────────
+    if not d["open_issues"]:
+        tickets = '<p class="quiet">Keine offenen Tickets.</p>'
+    else:
+        trs = []
+        for ident, title, status, prio, when, iid in d["open_issues"]:
+            cls = {"blocked": "down", "in_progress": "up",
+                   "in_review": "warn-dot"}.get(status, "unknown")
+            label = esc(ident)
+            if base:
+                label = f'<a href="{base}/issues/{esc(iid)}">{label}</a>'
+            trs.append(f'<tr><td class="mono">{label}</td>'
+                       f'<td>{esc(title)}</td>'
+                       f'<td><span class="dot {cls}"></span><span class="mono">{esc(status)}</span></td>'
+                       f'<td class="mono sub">{esc(prio)}</td>'
+                       f'<td class="mono sub">{esc(when)}</td></tr>')
+        issue_states = {}
+        for _, _, status, _, _, _ in d["open_issues"]:
+            issue_states[status] = issue_states.get(status, 0) + 1
+        tickets = (f'<div class="split">'
+                   f'<div class="grow"><table><thead><tr><th>Ticket</th><th>Titel</th>'
+                   f'<th>Status</th><th>Prio</th><th>Aktualisiert</th></tr></thead><tbody>'
+                   + "".join(trs) + '</tbody></table></div>'
+                   + donut(sorted(issue_states.items(), key=lambda x: -x[1]))
+                   + '</div>')
 
+    # ── KPIs ────────────────────────────────────────────────────────────────
     total_runs = sum(int(c) for _, c in d["runs"]) if d["runs"] else 0
     ok_runs = sum(int(c) for s, c in d["runs"] if s in ("succeeded", "success", "completed"))
-    rate = f"{round(ok_runs / total_runs * 100)}%" if total_runs else "—"
+    rate = round(ok_runs / total_runs * 100) if total_runs else None
+
+    days = [(lab, int(ok), int(bad)) for lab, ok, bad in d["runs_by_day"]]
+    chart = sparkbars([o + b for _, o, b in days], [l for l, _, _ in days])
 
     recent = ""
     if d["recent"]:
         items = []
-        for agent, status, when, err in d["recent"]:
+        for agent, status, when, err, rid, aid in d["recent"]:
             cls = "up" if status in ("succeeded", "success", "completed") else "down"
+            label = f'<strong>{esc(agent)}</strong>'
+            if base and aid:
+                label = f'<a href="{base}/agents"><strong>{esc(agent)}</strong></a>'
             items.append(f'<li><span class="dot {cls}"></span>'
-                         f'<span class="mono when">{esc(when)}</span> '
-                         f'<strong>{esc(agent)}</strong> <span class="mono">{esc(status)}</span>'
+                         f'<span class="mono when">{esc(when)}</span> {label} '
+                         f'<span class="mono">{esc(status)}</span>'
                          + (f'<span class="sub">{esc(err)}</span>' if err else "") + "</li>")
         recent = f'<h3>Letzte Läufe</h3><ul class="events">{"".join(items)}</ul>'
 
+    rate_cls = "ok" if (rate or 0) >= 80 else ("warn" if (rate or 0) >= 50 else "crit")
     kpi = (f'<div class="kpis">'
-           f'<div class="kpi"><b>{rate}</b><span>Erfolgsquote (7 T)</span></div>'
+           f'<div class="kpi"><b class="{rate_cls}">{rate if rate is not None else "—"}%</b>'
+           f'<span>Erfolgsquote (7 T)</span></div>'
            f'<div class="kpi"><b>{total_runs}</b><span>Läufe (7 T)</span></div>'
-           f'<div class="kpi"><b>{len(d["agents"])}</b><span>Agenten aktiv</span></div>'
-           f'</div><h3>Tickets</h3>{chips(d["issues"], "Keine Tickets.")}'
-           f'<h3>Läufe nach Status (7 Tage)</h3>'
-           f'{chips(d["runs"], "Keine Läufe in den letzten 7 Tagen.")}{recent}')
+           f'<div class="kpi"><b>{len(d["agents"])}</b><span>Agenten</span></div>'
+           f'<div class="kpi"><b>{len(d["open_issues"])}</b><span>offene Tickets</span></div>'
+           f'</div>'
+           f'<div class="split"><div class="grow">'
+           f'<h3>Läufe pro Tag</h3>{chart}</div>'
+           + (donut(sorted(((s, int(c)) for s, c in d["runs"]), key=lambda x: -x[1]))
+              if d["runs"] else "")
+           + f'</div>{recent}')
 
-    return section("Agenten", agents), section("Kennzahlen", kpi)
+    return (section("Agenten", agents), section("Tickets", tickets),
+            section("Kennzahlen", kpi))
 
 
 CSS = """
@@ -364,11 +487,11 @@ CSS = """
 @media(prefers-color-scheme:dark){:root{--ink:#e8e8e6;--soft:#a1a1aa;--quiet:#8b8b93;
 --paper:#141414;--rule:#2a2a2a;--ok:#4ade80;--warn:#facc15;--crit:#f87171}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.5;
+body{margin:0;background:var(--paper);color:var(--ink);font-size:16px;line-height:1.5;
 font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-main{max-width:60rem;margin:0 auto;padding:2.5rem 1.5rem 4rem}
+main{max-width:92rem;margin:0 auto;padding:2rem 2rem 4rem}
 header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:.5rem;margin-bottom:2rem}
-h1{font-size:1.5rem;font-weight:600;margin:0}
+h1{font-size:1.9rem;font-weight:600;margin:0;letter-spacing:-.02em}
 .stamp{font-size:.8rem;color:var(--quiet)}
 section{margin-bottom:2.5rem}
 h2{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
@@ -400,9 +523,28 @@ background:var(--quiet);vertical-align:middle}
 .chip{border:1px solid var(--rule);border-radius:4px;padding:.25rem .6rem;font-size:.82rem;color:var(--soft)}
 .chip b{color:var(--ink);font-variant-numeric:tabular-nums}
 .kpis{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:.5rem}
-.kpi{border:1px solid var(--rule);border-radius:6px;padding:.8rem 1.2rem;min-width:8rem}
-.kpi b{display:block;font-size:1.6rem;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi{border:1px solid var(--rule);border-radius:8px;padding:1.1rem 1.6rem;min-width:10rem;flex:1}
+.kpi b{display:block;font-size:2.2rem;font-weight:600;font-variant-numeric:tabular-nums}
 .kpi span{font-size:.78rem;color:var(--quiet)}
+--accent:#2563eb}
+@media(prefers-color-scheme:dark){:root{--accent:#6ba3f5}}
+.split{display:flex;gap:2rem;align-items:flex-start;flex-wrap:wrap}
+.grow{flex:1;min-width:22rem}
+.chart{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+.donut-n{font-size:22px;font-weight:600;fill:var(--ink)}
+.donut-l{font-size:10px;fill:var(--quiet)}
+.legend{list-style:none;margin:0;padding:0;font-size:.85rem;color:var(--soft)}
+.legend li{padding:.15rem 0;white-space:nowrap}
+.legend b{color:var(--ink);font-variant-numeric:tabular-nums;margin-left:.2rem}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:.45rem}
+.bars{max-width:34rem}
+.axis{font-size:9px;fill:var(--quiet)}
+.dot.warn-dot{background:var(--warn)}
+.kpi b.ok{color:var(--ok)}.kpi b.warn{color:var(--warn)}.kpi b.crit{color:var(--crit)}
+td a,.events a{color:var(--accent);text-decoration:none}
+td a:hover,.events a:hover{text-decoration:underline}
+tbody tr:hover{background:color-mix(in srgb,var(--rule) 40%,transparent)}
+@media(max-width:900px){.grow{min-width:100%}}
 @media(max-width:560px){table.kv th{width:auto;display:block;border:0;padding-bottom:0}
 table.kv td{border-top:0}table.kv tr{display:block;border-top:1px solid var(--rule);padding:.5rem 0}}
 """
@@ -412,8 +554,8 @@ def render_page():
     started = time.time()
     parts = [render_host()]
     svc, anom = render_services()
-    agents, kpi = render_paperclip()
-    parts += [svc, anom, agents, kpi]
+    agents, tickets, kpi = render_paperclip()
+    parts += [kpi, svc, anom, tickets, agents]
     took = time.time() - started
     now = datetime.now(timezone.utc).astimezone().strftime("%d.%m.%Y %H:%M:%S")
 

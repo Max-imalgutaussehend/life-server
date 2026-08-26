@@ -968,6 +968,10 @@ services:
       KUMA_DB: /data/kuma/kuma.db
       # Read-only role would be better and does not exist yet; this reuses
       # Paperclip's own credentials, and every query in the script is a SELECT.
+      # Public base URL for the links on the page. The dashboard reads the
+      # database directly but links to the UI, so a ticket row is one click
+      # from the board rather than a dead end.
+      PAPERCLIP_PUBLIC_URL: https://paperclip.${DOMAIN:?DOMAIN is not set in .env}
       PAPERCLIP_DSN: postgresql://paperclip:${POSTGRES_PAPERCLIP_PASSWORD:?POSTGRES_PAPERCLIP_PASSWORD is not set in .env}@${ENV_PREFIX_NAME:-prod-}postgres:5432/paperclip
       TZ: ${TZ:-Europe/Berlin}
     volumes:
