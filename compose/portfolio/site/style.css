@@ -254,6 +254,112 @@ h2 {
 	font-style: italic;
 }
 
+/* ── publication / project list ─────────────────────────────────────────── */
+
+.intro-line {
+	font-size: 0.92rem;
+	margin-bottom: 2rem;
+}
+
+.pub {
+	display: grid;
+	/* Fixed media column, fluid body — the thumbnails must line up down the
+	   page, and a fractional first column would let each one drift. */
+	grid-template-columns: 200px 1fr;
+	gap: 1.5rem;
+	padding: 2rem 0;
+	border-top: 1px solid var(--rule);
+	position: relative;
+}
+
+/* The year sits behind the entry, large and faint: it orders the list
+   without joining the competition for attention. */
+.pub-year {
+	position: absolute;
+	top: 0.4rem;
+	right: 0;
+	font-size: 2.6rem;
+	font-weight: 300;
+	line-height: 1;
+	color: var(--rule);
+	user-select: none;
+	pointer-events: none;
+}
+
+.pub-media {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.pub-tag {
+	display: block;
+	text-align: center;
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	padding: 0.3rem 0.5rem;
+	border-radius: 3px;
+	background: var(--ink);
+	color: var(--paper);
+}
+
+.pub-media img {
+	width: 100%;
+	height: auto;
+	border: 1px solid var(--rule);
+	border-radius: 3px;
+	display: block;
+}
+
+.pub-body {
+	min-width: 0;
+}
+
+.pub-title {
+	font-size: 1.05rem;
+	font-weight: 600;
+	color: var(--ink);
+	margin: 0 0 0.3rem;
+	/* Keep clear of the year watermark on wide screens. */
+	padding-right: 4rem;
+}
+
+.pub-meta {
+	font-size: 0.85rem;
+	color: var(--ink-quiet);
+	margin: 0 0 0.6rem;
+}
+
+.pub-abs {
+	font-size: 0.92rem;
+	margin: 0 0 0.9rem;
+}
+
+.pub-links {
+	display: flex;
+	gap: 0.5rem;
+	margin: 0;
+	flex-wrap: wrap;
+}
+
+.pub-links a {
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	color: var(--ink);
+	border: 1px solid var(--rule);
+	border-radius: 3px;
+	padding: 0.35rem 0.9rem;
+	text-decoration: none;
+}
+
+.pub-links a:hover {
+	border-color: var(--ink);
+	text-decoration: none;
+}
+
 /* ── CV, embedded as the PDF itself ─────────────────────────────────────── */
 
 .cv-embed {
@@ -362,6 +468,26 @@ footer p {
 		height: auto;
 		max-width: 280px;
 		aspect-ratio: 1;
+	}
+}
+
+@media (max-width: 620px) {
+	/* Thumbnail above the text rather than a 200px column squeezing it. */
+	.pub {
+		grid-template-columns: 1fr;
+		gap: 1rem;
+	}
+
+	.pub-media {
+		max-width: 260px;
+	}
+
+	.pub-year {
+		font-size: 1.8rem;
+	}
+
+	.pub-title {
+		padding-right: 3rem;
 	}
 }
 

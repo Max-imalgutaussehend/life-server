@@ -17,7 +17,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="alternate" hreflang="de" href="https://maxrommel.de/de/" />
 <link rel="alternate" hreflang="en" href="https://maxrommel.de/" />
-<link rel="stylesheet" href="/style.css?v=f3a07e2c" />
+<link rel="stylesheet" href="/style.css?v=d2aab6a3" />
 
 <!--
   The radio inputs live before everything they affect: CSS can only style
@@ -119,7 +119,38 @@
   <!-- ── Projects ─────────────────────────────────────────────────────── -->
   <section class="panel" id="p-projects">
     <h2>Projects</h2>
-    <p class="placeholder">In progress.</p>
+    <p class="intro-line">
+      Selected work, newest first.
+    </p>
+
+    <!--
+      The year is a watermark rather than a heading: it orders the list
+      without competing with the titles for attention. It repeats per entry
+      instead of grouping them, which costs a little duplication and buys the
+      ability to reorder or drop a single entry without touching a group.
+    -->
+    <div class="pub">
+      <span class="pub-year" aria-hidden="true">2026</span>
+      <div class="pub-media">
+        <span class="pub-tag">SAP · Open Source</span>
+        <img src="/img/cbar.svg" alt="Diagram: a router selects one of several agents per request and learns from the observed reward" width="480" height="290" loading="lazy" />
+      </div>
+      <div class="pub-body">
+        <h3 class="pub-title">Contextual Bandit Agent Router</h3>
+        <p class="pub-meta">Python library · Apache-2.0 · Jun 2026</p>
+        <p class="pub-abs">
+          Learns in production which agent in a multi-agent system handles a
+          given request best, using four contextual multi-armed bandit
+          algorithms (LinUCB, Thompson sampling and others). Ships three
+          deployment modes: in-process, a REST/MCP server, and a learning
+          proxy.
+        </p>
+        <p class="pub-links">
+          <a href="https://github.com/SAP/contextual-bandit-agent-router">CODE</a>
+          <a href="https://github.com/SAP/contextual-bandit-agent-router/blob/main/docs/USAGE.md">DOCS</a>
+        </p>
+      </div>
+    </div>
   </section>
 
   <!-- ── CV ───────────────────────────────────────────────────────────── -->

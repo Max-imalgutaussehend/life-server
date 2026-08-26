@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 290" role="img" aria-label="Diagram: a request enters a contextual bandit router, which selects one of several agents and feeds the observed reward back into the model">
+  <!--
+    cbar.svg — thumbnail for the contextual-bandit-agent-router project.
+
+    Drawn rather than screenshotted: a library has no single screen worth
+    showing, and the one thing worth showing is the loop — a request is routed
+    to one agent, the outcome is observed, and that observation changes the
+    next routing decision. That feedback edge is the whole idea of a bandit,
+    so it is the only curved line in the drawing.
+
+    Colours come from the page's own palette via a media query, so the
+    thumbnail sits in the design rather than on top of it.
+  -->
+  <style>
+    .bg    { fill: #ffffff; }
+    .card  { fill: #f4f4f5; stroke: #d4d4d8; }
+    .pick  { fill: #e4e4e7; stroke: #71717a; }
+    .line  { stroke: #a1a1aa; }
+    .learn { stroke: #52525b; }
+    .t     { fill: #3f3f46; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .tq    { fill: #71717a; }
+    @media (prefers-color-scheme: dark) {
+      .bg    { fill: #1c1c1c; }
+      .card  { fill: #262626; stroke: #3f3f46; }
+      .pick  { fill: #2f2f2f; stroke: #a1a1aa; }
+      .line  { stroke: #6b6b73; }
+      .learn { stroke: #a1a1aa; }
+      .t     { fill: #d4d4d8; }
+      .tq    { fill: #8b8b93; }
+    }
+  </style>
+
+  <rect class="bg" width="480" height="290" />
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="context-stroke" />
+    </marker>
+  </defs>
+
+  <!-- request -->
+  <text class="t tq" x="24" y="106" font-size="13">request</text>
+  <line class="line" x1="24" y1="118" x2="118" y2="118" stroke-width="1.5" marker-end="url(#a)" />
+
+  <!-- router -->
+  <rect class="pick" x="126" y="88" width="112" height="60" rx="5" stroke-width="1.5" />
+  <text class="t" x="182" y="112" font-size="13" font-weight="600" text-anchor="middle">router</text>
+  <text class="t tq" x="182" y="131" font-size="11" text-anchor="middle">LinUCB · Thompson</text>
+
+  <!-- fan-out to agents -->
+  <line class="line" x1="238" y1="106" x2="330" y2="62"  stroke-width="1.5" marker-end="url(#a)" />
+  <line class="line" x1="238" y1="118" x2="330" y2="118" stroke-width="1.5" marker-end="url(#a)" />
+  <line class="line" x1="238" y1="130" x2="330" y2="174" stroke-width="1.5" marker-end="url(#a)" />
+
+  <rect class="card" x="338" y="42"  width="118" height="40" rx="5" stroke-width="1.2" />
+  <rect class="pick" x="338" y="98"  width="118" height="40" rx="5" stroke-width="1.8" />
+  <rect class="card" x="338" y="154" width="118" height="40" rx="5" stroke-width="1.2" />
+  <text class="t tq" x="397" y="67"  font-size="12" text-anchor="middle">agent A</text>
+  <text class="t"    x="397" y="123" font-size="12" text-anchor="middle" font-weight="600">agent B</text>
+  <text class="t tq" x="397" y="179" font-size="12" text-anchor="middle">agent C</text>
+
+  <!-- the feedback loop: the only curve, because it is the point -->
+  <path class="learn" d="M462 118 C 500 250, 182 262, 182 152"
+        fill="none" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#a)" />
+  <text class="t" x="300" y="249" font-size="12" text-anchor="middle">observed reward</text>
+
+  <text class="t tq" x="24" y="279" font-size="11">learns which agent wins, per request, in production</text>
+</svg>
