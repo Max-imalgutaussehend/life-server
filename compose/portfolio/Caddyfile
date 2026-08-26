@@ -39,14 +39,31 @@ http://:8080 {
 	# This host serves files and nothing else. These headers cost nothing and
 	# close the obvious classes of abuse for a page with no scripts at all.
 	header X-Content-Type-Options "nosniff"
-	header X-Frame-Options "DENY"
+	# DENY on the HTML, but NOT on the PDF: Chrome renders an embedded PDF in
+	# an internal frame, and DENY blocks that — the CV tab fell back to "your
+	# browser cannot display the PDF inline" on a browser that plainly can.
+	# SAMEORIGIN keeps other sites from framing the document while letting our
+	# own page embed it.
+	# Caddy's header directives are not applied in file order — a later
+	# unmatched `header` still wins over an earlier matched one, which is why
+	# a `@pdf` override placed after the generic DENY silently did nothing.
+	# Both are matched instead, so neither can override the other.
+	@nonpdf not path *.pdf
+	header @nonpdf X-Frame-Options "DENY"
+	@pdf path *.pdf
+	header @pdf X-Frame-Options "SAMEORIGIN"
 	header Referrer-Policy "no-referrer"
+
+	# NOTE ON "[email protected]": Cloudflare rewrites mailto: links at the
+	# edge. The per-response opt-out headers (Email-Obfuscation, page-speed)
+	# were tried here and are IGNORED — it is a zone setting only. The page
+	# therefore avoids raw mailto: hrefs entirely; see index.html.
 	# object-src 'self' is the one loosening of default-src 'none', and it is
 	# what lets the CV tab embed its own PDF. Scoped to same-origin, so it
 	# permits exactly one thing: a file served from this container. Historic
 	# object-src abuse was about Flash and remote plugins — neither is
 	# reachable from 'self' on a static file server with no scripts.
-	header Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; object-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'none'; style-src 'self'; img-src 'self'; object-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 	# Health endpoint for the container healthcheck and Uptime Kuma.
 	respond /healthz "ok" 200

@@ -28,29 +28,46 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SITE="$REPO/compose/portfolio/site"
 CSS="$SITE/style.css"
+PDF="$SITE/Max_Rommel_CV.pdf"
 HTML="$SITE/index.html"
 
-for f in "$CSS" "$HTML"; do
+for f in "$CSS" "$PDF" "$HTML"; do
 	[[ -f "$f" ]] || { echo "error: $f missing" >&2; exit 1; }
 done
 
 # md5 on macOS, md5sum on Linux — this runs from either.
-if command -v md5 >/dev/null 2>&1; then
-	HASH="$(md5 -q "$CSS" | cut -c1-8)"
-else
-	HASH="$(md5sum "$CSS" | cut -c1-8)"
-fi
+hash_of() {
+	if command -v md5 >/dev/null 2>&1; then
+		md5 -q "$1" | cut -c1-8
+	else
+		md5sum "$1" | cut -c1-8
+	fi
+}
 
-python3 - "$HTML" "$HASH" <<'PY'
+CSS_HASH="$(hash_of "$CSS")"
+PDF_HASH="$(hash_of "$PDF")"
+
+python3 - "$HTML" "$CSS_HASH" "$PDF_HASH" <<'PY'
 import re, sys
-path, h = sys.argv[1], sys.argv[2]
+path, css_h, pdf_h = sys.argv[1], sys.argv[2], sys.argv[3]
 src = open(path).read()
-new, n = re.subn(r'href="/style\.css(?:\?v=[0-9a-f]+)?"', f'href="/style.css?v={h}"', src)
-if n == 0:
+new = src
+
+new, n1 = re.subn(r'href="/style\.css(?:\?v=[0-9a-f]+)?"',
+                  f'href="/style.css?v={css_h}"', new)
+if n1 == 0:
     sys.exit("error: no stylesheet link found in " + path)
+
+# The CV is replaced from time to time; without a stamp the edge would keep
+# serving the previous PDF under the same URL.
+new, n2 = re.subn(r'(?P<a>(?:href|data)="/Max_Rommel_CV\.pdf)(?:\?v=[0-9a-f]+)?"',
+                  lambda m: f'{m.group("a")}?v={pdf_h}"', new)
+if n2 == 0:
+    sys.exit("error: no CV reference found in " + path)
+
 if new != src:
     open(path, 'w').write(new)
-    print(f"stamped style.css?v={h}")
+    print(f"stamped style.css?v={css_h}  CV?v={pdf_h}  ({n1}+{n2} refs)")
 else:
-    print(f"already current (v={h})")
+    print(f"already current (css={css_h} pdf={pdf_h})")
 PY

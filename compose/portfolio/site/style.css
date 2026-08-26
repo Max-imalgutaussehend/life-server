@@ -301,6 +301,14 @@ footer {
 	padding: 1.5rem 0 4rem;
 }
 
+/* The address is split across elements to defeat Cloudflare's email scanner;
+   this keeps it looking like one word. */
+.addr,
+.addr span {
+	display: inline;
+	white-space: nowrap;
+}
+
 footer p {
 	font-size: 0.85rem;
 	color: var(--ink-quiet);
