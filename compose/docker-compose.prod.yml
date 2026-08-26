@@ -580,6 +580,16 @@ services:
       # about a CLI command that needs a config file this deployment has not
       # got.
       PAPERCLIP_ALLOWED_HOSTNAMES: paperclip.${DOMAIN},${ENV_PREFIX_NAME:-prod-}paperclip,localhost
+
+      # M15: worker agents run the `claude_local` adapter, which shells out to
+      # the Claude Code CLI bundled in this image. That CLI needs a credential
+      # and had none — every worker run would have failed on auth.
+      #
+      # Pointed at the router rather than at cliproxy directly, for the same
+      # reason Hermes and OpenClaw are (ADR-0021): the subscription's ceiling
+      # is reached through it, not around it.
+      ANTHROPIC_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}omniroute:20128
+      ANTHROPIC_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       # PAPERCLIP_HOME. Not optional, and not obvious: the container ran for
