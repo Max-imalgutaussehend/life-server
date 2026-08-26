@@ -89,6 +89,23 @@ http://paperclip{$ENV_PREFIX}.{$DOMAIN} {
 	}
 }
 
+# ── dashboard — System, services, agents and KPIs on one page (M17)
+#    access: private (Cloudflare Access enforces auth at the edge)
+#    networks: apps, data
+http://dashboard{$ENV_PREFIX}.{$DOMAIN} {
+	# Upstream is the container name, resolved by Docker's embedded DNS.
+	# {$ENV_PREFIX_NAME} yields e.g. "prod-" so the target is prod-dashboard.
+	reverse_proxy {$ENV_PREFIX_NAME}dashboard:8090 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto https
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
 # ── openclaw — OpenClaw Control — the agent's own web chat (M14)
 #    access: private (Cloudflare Access enforces auth at the edge)
 #    networks: agent

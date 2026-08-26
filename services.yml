@@ -94,6 +94,22 @@ services:
   #
   # It is a plain compose service on `agent` only. See ADR-0020.
 
+  # ── dashboard — the whole system on one page (M17) ────────────────────────
+  # Reads Uptime Kuma's database and Paperclip's, plus /proc. It writes
+  # nothing anywhere, which is what makes `networks: [apps, data]` acceptable
+  # for a service that is reachable from outside: being on `data` lets it
+  # SELECT, and there is no code path in it that does anything else.
+  #
+  # `access: private` — this shows the state of every service, the agent
+  # roster and the ticket board. Cloudflare Access is what keeps it the
+  # operator's own view.
+  - name: dashboard
+    port: 8090
+    description: "System, services, agents and KPIs on one page (M17)"
+    networks: [apps, data]
+    access: private
+    enabled: true # M17
+
   # ── openclaw — the exception to the paragraph above (M14, ADR-0022) ───────
   # OpenClaw's gateway serves its own web chat ("OpenClaw Control") on 18789.
   # The operator asked for a browser client because WhatsApp is too limited,

@@ -53,6 +53,10 @@ ingress:
   - hostname: "paperclip${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
+  # dashboard — System, services, agents and KPIs on one page (M17) [access: private]
+  - hostname: "dashboard${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
   # openclaw — OpenClaw Control — the agent's own web chat (M14) [access: private]
   - hostname: "openclaw${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80

@@ -19,7 +19,8 @@
             "name": "Claude Sonnet 5",
             "reasoning": false,
             "input": [
-              "text"
+              "text",
+              "image"
             ],
             "contextWindow": 200000,
             "maxTokens": 8192
