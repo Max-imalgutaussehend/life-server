@@ -306,7 +306,11 @@ h2 {
 }
 
 .pub-media img {
+	/* Square icon, not a wide screenshot: capped so it stays an icon rather
+	   than becoming a panel. */
 	width: 100%;
+	max-width: 148px;
+	align-self: center;
 	height: auto;
 	border: 1px solid var(--rule);
 	border-radius: 3px;
