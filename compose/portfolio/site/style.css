@@ -72,6 +72,16 @@ main {
 
 header {
 	margin: 4rem 0 2rem;
+	display: flex;
+	align-items: baseline;
+	gap: 2.5rem;
+	flex-wrap: wrap;
+}
+
+header h1 {
+	/* Never let "Max Rommel" break across two lines — that was the single
+	   worst thing about the previous header. */
+	white-space: nowrap;
 }
 
 /* Light weight overall, bold on the first name only — the reference does the
@@ -219,62 +229,106 @@ h2 {
 	font-style: italic;
 }
 
-/* ── CV ─────────────────────────────────────────────────────────────────── */
+/* ── CV, rendered in the shape of the PDF ───────────────────────────────── */
 
-.cv-section {
-	font-size: 0.75rem;
-	font-weight: 600;
+.resume-name {
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: var(--ink);
+	text-transform: none;
+	letter-spacing: -0.01em;
+	border: 0;
+	margin: 0 0 0.2rem;
+	padding: 0;
+}
+
+.resume-contact {
+	font-size: 0.88rem;
+	color: var(--ink-soft);
+	margin: 0 0 0.4rem;
+	padding-bottom: 0.6rem;
+	border-bottom: 2px solid var(--ink);
+}
+
+/* Section headings: small caps over a rule, as in the document. */
+.rs {
+	font-size: 0.78rem;
+	font-weight: 700;
 	text-transform: uppercase;
-	letter-spacing: 0.09em;
-	color: var(--ink-quiet);
-	margin: 2.5rem 0 1rem;
-	padding-bottom: 0.4rem;
-	border-bottom: 1px solid var(--rule);
+	letter-spacing: 0.07em;
+	color: var(--ink);
+	margin: 1.6rem 0 0.7rem;
+	padding-bottom: 0.25rem;
+	border-bottom: 1px solid var(--ink);
 }
 
-.cv-section:first-of-type {
-	margin-top: 0;
+.re {
+	margin: 0 0 1.2rem;
 }
 
-.entry {
-	margin: 0 0 1.6rem;
-}
-
-.entry-head,
-.entry-sub {
+/* Organisation left, date right — the layout that makes a CV scannable. */
+.re-top,
+.re-mid {
 	display: flex;
 	justify-content: space-between;
 	align-items: baseline;
-	gap: 1rem;
-	margin: 0 0 0.2rem;
-	color: var(--ink);
-}
-
-.entry-sub {
-	color: var(--ink-soft);
+	gap: 1.5rem;
+	margin: 0;
 	font-size: 0.94rem;
 }
 
-.entry-meta {
-	color: var(--ink-quiet);
-	font-size: 0.85rem;
+.re-org {
+	font-weight: 700;
+	color: var(--ink);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-thickness: 1px;
+}
+
+.re-mid {
+	color: var(--ink-soft);
+}
+
+.re-mid em {
+	font-style: italic;
+}
+
+/* A rotation inside a role: indented so the hierarchy is visible. */
+.re-sub {
+	margin-top: 0.8rem;
+}
+
+.re-date,
+.re-place {
+	color: var(--ink);
+	font-size: 0.88rem;
 	white-space: nowrap;
 	flex-shrink: 0;
 }
 
-.entry ul {
-	margin: 0.5rem 0 0;
+.re-top .re-date {
+	font-weight: 700;
+}
+
+.re-place {
+	font-style: italic;
+	color: var(--ink-soft);
+}
+
+.re ul {
+	margin: 0.35rem 0 0;
 	padding-left: 1.1rem;
 }
 
-.entry li {
+.re li {
 	color: var(--ink-soft);
-	margin-bottom: 0.4rem;
-	font-size: 0.95rem;
+	margin-bottom: 0.25rem;
+	font-size: 0.92rem;
+	line-height: 1.5;
 }
 
 .skills {
-	margin: 0;
+	margin: 0.3rem 0 0;
 	display: grid;
 	grid-template-columns: auto 1fr;
 	gap: 0.35rem 1.2rem;
@@ -382,13 +436,19 @@ footer p {
 	}
 
 	/* The date would otherwise squeeze the role into one character per line. */
-	.entry-head,
-	.entry-sub {
+	.re-top,
+	.re-mid {
 		flex-direction: column;
-		gap: 0.1rem;
+		gap: 0.05rem;
 	}
 
-	.entry-meta {
+	.re-date,
+	.re-place {
+		white-space: normal;
+	}
+
+	/* The name may wrap on a phone — there is no room not to. */
+	header h1 {
 		white-space: normal;
 	}
 

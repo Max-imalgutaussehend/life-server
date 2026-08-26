@@ -120,119 +120,123 @@
 
   <!-- ── CV ───────────────────────────────────────────────────────────── -->
   <section class="panel" id="p-cv">
-    <h2>Curriculum Vitae</h2>
+    <!--
+      Rendered in the shape of the PDF itself: a name block with a contact
+      line, then sections where the employer sits left and the date right,
+      the role italic below it and the location right. Same reading order as
+      the document, so someone who has seen the PDF finds the same thing in
+      the same place.
+    -->
+    <div class="resume">
+      <h2 class="resume-name">Max Rommel</h2>
+      <p class="resume-contact">
+        Mannheim, Germany |
+        <a href="mailto:illuminati_max@web.de">illuminati_max@web.de</a> |
+        <a href="https://github.com/Max-imalgutaussehend">GitHub</a>
+      </p>
 
-    <h3 class="cv-section">Education</h3>
-    <article class="entry">
-      <p class="entry-head">
-        <strong>Baden-Württemberg Cooperative State University</strong>
-        <span class="entry-meta">Mannheim, Germany</span>
-      </p>
-      <p class="entry-sub">
-        <em>B.Sc. Business Information Systems – Software Engineering</em>
-        <span class="entry-meta">Sep 2024 – Sep 2027 (expected)</span>
-      </p>
-      <ul>
-        <li>Grade 1.4 (German scale, 1.0 best); dual-study programme run in cooperation with SAP SE</li>
-        <li>Relevant coursework: Accounting &amp; Finance, Statistics &amp; Operations Research, Project Management</li>
-        <li>Bachelor's thesis: benchmarking quantum optimisation against classical solvers on supply chain problems, including the hardware threshold at which the approach becomes commercially viable</li>
-      </ul>
-    </article>
+      <h3 class="rs">Education</h3>
+      <article class="re">
+        <p class="re-top">
+          <span class="re-org">Baden-Württemberg Cooperative State University</span>
+          <span class="re-date">Sep. 2024 – Sep. 2027 (expected)</span>
+        </p>
+        <p class="re-mid">
+          <em>B.Sc. Business Information Systems – Software Engineering</em>
+          <span class="re-place">Mannheim, Germany</span>
+        </p>
+        <ul>
+          <li><strong>Grade 1.4</strong> (German scale, 1.0 best); dual-study programme run in cooperation with SAP SE</li>
+          <li>Relevant coursework: Accounting &amp; Finance, Statistics &amp; Operations Research, Project Management</li>
+          <li>Bachelor's thesis: benchmarking <strong>quantum optimisation</strong> against classical solvers on supply chain problems, including the hardware threshold at which the approach becomes commercially viable</li>
+        </ul>
+      </article>
 
-    <h3 class="cv-section">Experience</h3>
-    <article class="entry">
-      <p class="entry-head">
-        <strong>SAP SE</strong>
-        <span class="entry-meta">Walldorf, Germany &amp; New York, USA</span>
-      </p>
-      <p class="entry-sub">
-        <em>Student Training and Rotation (STAR) Program</em>
-        <span class="entry-meta">Sep 2024 – Sep 2027</span>
-      </p>
-    </article>
+      <h3 class="rs">Experience</h3>
+      <article class="re">
+        <p class="re-top">
+          <span class="re-org">SAP SE</span>
+          <span class="re-date">Sep. 2024 – Sep. 2027</span>
+        </p>
+        <p class="re-mid">
+          <em>Student Training and Rotation (STAR) Program, including:</em>
+          <span class="re-place">Walldorf, Germany &amp; New York, USA</span>
+        </p>
 
-    <article class="entry">
-      <p class="entry-sub">
-        <em>Private Equity Relations &amp; Consulting, Global Private Equity – New York</em>
-        <span class="entry-meta">May 2026 – Aug 2026</span>
-      </p>
-      <ul>
-        <li>Screened 20,000+ live deals and re-prioritised the top 1,500 through a multi-criteria risk framework combining rule-based and LLM-based scoring of deal team and partner notes, replacing blanket coverage with signal-driven targeting</li>
-        <li>Consolidated 40,000+ portfolio companies and 20,000+ deals into a single pipeline and portfolio view relied on by 12 Managing Directors and regional private markets leads, cutting research cycles from weeks to seconds</li>
-        <li>Ran deep dives on business models and AI value-creation potential across technology portfolio companies, acting as domain advisor to sponsors, implementation partners and internal sales teams from diligence through value creation</li>
-      </ul>
-    </article>
+        <p class="re-mid re-sub">
+          <em>Private Equity Relations &amp; Consulting, Global Private Equity – New York</em>
+          <span class="re-date">May 2026 – Aug. 2026</span>
+        </p>
+        <ul>
+          <li>Screened <strong>20,000+ live deals</strong> and re-prioritised the top 1,500 through a multi-criteria risk framework combining rule-based and LLM-based scoring of deal team and partner notes, replacing blanket coverage with signal-driven targeting</li>
+          <li>Consolidated <strong>40,000+ portfolio companies</strong> and 20,000+ deals into a single pipeline and portfolio view relied on by 12 Managing Directors and regional private markets leads, cutting research cycles from weeks to seconds</li>
+          <li>Ran deep dives on business models and <strong>AI value-creation potential</strong> across technology portfolio companies, acting as domain advisor to sponsors, implementation partners and internal sales teams from diligence through value creation</li>
+        </ul>
 
-    <article class="entry">
-      <p class="entry-sub">
-        <em>AI Research &amp; Advisory, AI Blackbelt MEE – Walldorf</em>
-        <span class="entry-meta">Nov 2025 – Feb 2026</span>
-      </p>
-      <ul>
-        <li>Researched multi-agent decision-making under Bayesian game theory and reinforcement learning, improving agentic decision optimisation by 172% over a default self-routing agent baseline in a microgrid test case</li>
-        <li>Generalised the approach into a reusable open-source framework, released under the SAP organisation on GitHub</li>
-        <li>Delivered a custom client proof of concept and translated the findings into executive-level material for demos and partner workshops across the MEE region</li>
-      </ul>
-    </article>
+        <p class="re-mid re-sub">
+          <em>AI Research &amp; Advisory, AI Blackbelt MEE – Walldorf</em>
+          <span class="re-date">Nov. 2025 – Feb. 2026</span>
+        </p>
+        <ul>
+          <li>Researched <strong>multi-agent decision-making</strong> under Bayesian game theory and reinforcement learning, improving agentic decision optimisation by <strong>172%</strong> over a default self-routing agent baseline in a microgrid test case</li>
+          <li>Generalised the approach into a reusable open-source framework, released under the SAP organisation on <a href="https://github.com/Max-imalgutaussehend">GitHub</a></li>
+          <li>Delivered a custom client proof of concept and translated the findings into executive-level material for demos and partner workshops across the MEE region</li>
+        </ul>
 
-    <article class="entry">
-      <p class="entry-sub">
-        <em>Partner Evaluation &amp; Integration, Digital Currency Hub – Walldorf</em>
-        <span class="entry-meta">Jan 2025 – Aug 2025</span>
-      </p>
-      <ul>
-        <li>Scouted and screened external exchange and infrastructure providers, assessing technology, integration effort and commercial terms before recommending the partner taken forward</li>
-        <li>Owned the resulting decentralised exchange integration into SAP's core ERP end to end, from technical evaluation through to production delivery</li>
-        <li>Led communication with external partners across organisations; the solution was subsequently adopted into SAP's product suite</li>
-      </ul>
-    </article>
+        <p class="re-mid re-sub">
+          <em>Partner Evaluation &amp; Integration, Digital Currency Hub – Walldorf</em>
+          <span class="re-date">Jan. 2025 – Aug. 2025</span>
+        </p>
+        <ul>
+          <li>Scouted and screened external exchange and infrastructure providers, assessing technology, integration effort and commercial terms before recommending the partner taken forward</li>
+          <li>Owned the resulting <strong>decentralised exchange integration</strong> into SAP's core ERP end to end, from technical evaluation through to production delivery</li>
+          <li>Led communication with external partners across organisations; the solution was subsequently <strong>adopted into SAP's product suite</strong></li>
+        </ul>
+      </article>
 
-    <h3 class="cv-section">Extracurricular Activities</h3>
-    <article class="entry">
-      <p class="entry-head">
-        <strong>Mannheim Investment Club e.V.</strong>
-        <span class="entry-meta">Mannheim, Germany</span>
-      </p>
-      <p class="entry-sub">
-        <em>Private Equity Team &amp; Staff Unit to the Executive Board (Information Systems)</em>
-        <span class="entry-meta">Sep 2025 – Present</span>
-      </p>
-      <ul>
-        <li>Member of the private equity team at one of the largest student finance societies in the DACH region, covering deal analysis, business model assessment and market research</li>
-        <li>Worked through live transactions with the investment teams of 3 mid-market private equity firms in dedicated deal workshops</li>
-        <li>Scaled the club's information systems to its current 700+ members as a staff unit reporting directly to the executive board</li>
-      </ul>
-    </article>
+      <h3 class="rs">Extracurricular Activities</h3>
+      <article class="re">
+        <p class="re-top">
+          <span class="re-org">Mannheim Investment Club e.V.</span>
+          <span class="re-date">Sep. 2025 – Present</span>
+        </p>
+        <p class="re-mid">
+          <em>Private Equity Team &amp; Staff Unit to the Executive Board (Information Systems)</em>
+          <span class="re-place">Mannheim, Germany</span>
+        </p>
+        <ul>
+          <li>Member of the private equity team at one of the <strong>largest student finance societies in the DACH region</strong>, covering deal analysis, business model assessment and market research</li>
+          <li>Worked through live transactions with the investment teams of <strong>3 mid-market private equity firms</strong> in dedicated deal workshops</li>
+          <li>Scaled the club's information systems to its current <strong>700+ members</strong> as a staff unit reporting directly to the executive board</li>
+        </ul>
+      </article>
 
-    <article class="entry">
-      <p class="entry-head">
-        <strong>Student Body (StuV), DHBW Mannheim</strong>
-        <span class="entry-meta">Mannheim, Germany</span>
-      </p>
-      <p class="entry-sub">
-        <em>Finance Officer</em>
-        <span class="entry-meta">Oct 2025 – Present</span>
-      </p>
-      <ul>
-        <li>Manage a five-figure annual budget, covering planning, allocation across student initiatives and year-end reporting</li>
-      </ul>
-    </article>
+      <article class="re">
+        <p class="re-top">
+          <span class="re-org">Student Body (StuV), DHBW Mannheim</span>
+          <span class="re-date">Oct. 2025 – Present</span>
+        </p>
+        <p class="re-mid">
+          <em>Finance Officer</em>
+          <span class="re-place">Mannheim, Germany</span>
+        </p>
+        <ul>
+          <li>Manage a <strong>five-figure annual budget</strong>, covering planning, allocation across student initiatives and year-end reporting</li>
+        </ul>
+      </article>
 
-    <h3 class="cv-section">Skills &amp; Interests</h3>
-    <dl class="skills">
-      <dt>Languages</dt>
-      <dd>German (native, C2), English (C1)</dd>
-      <dt>Tools</dt>
-      <dd>PitchBook, Power BI</dd>
-      <dt>Technical</dt>
-      <dd>Python, SQL, Knowledge Graphs, AI agents (LangGraph, OpenClaw, Hermes)</dd>
-      <dt>Interests</dt>
-      <dd>Olympic wrestling (10+ years, competitive), long-distance running (Pfälzerwald Marathon 2025 finisher)</dd>
-    </dl>
-
-    <p class="quiet">
-      References and full contact details on request.
-    </p>
+      <h3 class="rs">Skills &amp; Interests</h3>
+      <dl class="skills">
+        <dt>Languages</dt>
+        <dd>German (native, C2), English (C1)</dd>
+        <dt>Tools</dt>
+        <dd>PitchBook, Power BI</dd>
+        <dt>Technical</dt>
+        <dd>Python, SQL, Knowledge Graphs, AI agents (LangGraph, OpenClaw, Hermes)</dd>
+        <dt>Interests</dt>
+        <dd>Olympic wrestling (10+ years, competitive), long-distance running (Pfälzerwald Marathon 2025 finisher)</dd>
+      </dl>
+    </div>
   </section>
 
   <footer>
