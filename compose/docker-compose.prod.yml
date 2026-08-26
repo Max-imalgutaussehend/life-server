@@ -732,6 +732,12 @@ services:
       # Minted by Uptime Kuma when the `cliproxy` push monitor is created.
       # Empty means the heartbeat exits loudly rather than pretending to work.
       KUMA_PUSH_URL: ${KUMA_PUSH_URL:-}
+      # M17: a second push monitor, for the router. Kuma cannot poll omniroute
+      # (it is on `agent`), and this sidecar is already on both networks.
+      # Empty = unreported, never a startup failure.
+      OMNIROUTE_PUSH_URL: ${OMNIROUTE_PUSH_URL:-}
+      OMNIROUTE_HOST: ${ENV_PREFIX_NAME:-prod-}omniroute
+      OMNIROUTE_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
       HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-3600}
       TZ: ${TZ:-Europe/Berlin}
     volumes:

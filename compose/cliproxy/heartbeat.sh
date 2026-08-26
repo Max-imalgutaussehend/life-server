@@ -33,6 +33,34 @@ INTERVAL="${HEARTBEAT_INTERVAL:-3600}"
 
 # Without a push URL there is nothing to report to. That is a misconfiguration,
 # not a reason to spin: exit loudly so `docker logs` says why.
+# M17: omniroute gets its own push monitor, reported from here.
+#
+# It sits on `agent`, where Kuma cannot resolve names — an HTTP monitor for it
+# reported a permanent outage for a healthy service. This sidecar is already
+# on both networks (see the compose comment above, which explains why it is
+# the only container that is), so it is the natural place to report from.
+#
+# NOTE: this is a SEPARATE check, not a by-product of the one below. The
+# credential heartbeat talks to cliproxy DIRECTLY, not through the router —
+# so a successful completion says nothing about omniroute.
+#
+# Empty value = that monitor simply goes unreported.
+OMNIROUTE_PUSH_URL="${OMNIROUTE_PUSH_URL:-}"
+OMNIROUTE="http://${OMNIROUTE_HOST:-omniroute}:20128"
+
+report_omniroute() {
+	[ -n "$OMNIROUTE_PUSH_URL" ] || return 0
+	# /v1/models needs no completion and costs no tokens, but it does prove the
+	# router is serving its API rather than merely holding a port open.
+	if wget -qO- --timeout=15 --header="Authorization: Bearer ${OMNIROUTE_API_KEY:-}" \
+		"${OMNIROUTE}/v1/models" >/dev/null 2>&1; then
+		wget -qO- --timeout=15 "${OMNIROUTE_PUSH_URL}?status=up&msg=ok" >/dev/null 2>&1 || true
+	else
+		echo "heartbeat: omniroute did not answer /v1/models" >&2
+		wget -qO- --timeout=15 "${OMNIROUTE_PUSH_URL}?status=down&msg=no%20answer" >/dev/null 2>&1 || true
+	fi
+}
+
 if [ -z "${KUMA_PUSH_URL:-}" ]; then
 	echo "heartbeat: KUMA_PUSH_URL is not set — the credential will NOT be monitored" >&2
 	echo "           mint it in Uptime Kuma (the cliproxy push monitor), then set it in .env" >&2
@@ -60,6 +88,8 @@ while true; do
 		--header="Authorization: Bearer ${PROXY_API_KEY}" \
 		--post-data="$body" \
 		"${PROXY}/v1/chat/completions" 2>&1 | awk '/^  HTTP/{print $2; exit}')"
+
+	report_omniroute
 
 	case "$code" in
 		2*)

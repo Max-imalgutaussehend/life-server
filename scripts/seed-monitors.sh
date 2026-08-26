@@ -119,7 +119,17 @@ const monitors = [
   // widening Kuma into that segment is exactly what the cliproxy push monitor
   // above exists to avoid. Their health is visible through the runs they
   // produce, on the dashboard.
-  { name: "omniroute", url: "http://" + process.env.PREFIX + "omniroute:20128/v1/models" },
+  // omniroute is a PUSH monitor for the same reason cliproxy is: it lives on
+  // `agent`, Kuma lives on `apps`, and Kuma cannot resolve names there.
+  //
+  // This was first added as an HTTP monitor and reported a permanent outage
+  // for a healthy service — getaddrinfo ENOTFOUND, which reads like a crash
+  // and is really a network boundary. The reasoning was already written down
+  // three paragraphs above, for cliproxy, and got missed anyway.
+  //
+  // The heartbeat sidecar reports it: its hourly check already goes THROUGH
+  // omniroute to reach cliproxy, so a successful completion proves both.
+  { name: "omniroute", type: "push", interval: 3900 },
   { name: "portfolio", url: "http://" + process.env.PREFIX + "portfolio:8080/healthz" },
   { name: "dashboard", url: "http://" + process.env.PREFIX + "dashboard:8090/healthz" },
   // postgres and redis are NOT here on purpose. They sit on `data`
