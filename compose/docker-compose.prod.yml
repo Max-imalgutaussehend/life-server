@@ -1072,7 +1072,18 @@ services:
       #
       # n8n is NOT on the agent network, so this goes through Caddy by
       # hostname — the same path a browser takes.
-      N8N_URL: https://n8n.${DOMAIN:?DOMAIN is not set in .env}
+      # Through Caddy, NOT through the public hostname. n8n sits behind
+      # Cloudflare Access, which answers an API call with a 302 to its login
+      # page no matter how valid the API key is — Access runs at the edge,
+      # before n8n ever sees the request.
+      #
+      # Caddy reaches n8n on `apps` and applies no Access check of its own, so
+      # this is the internal path the key was issued for. The Host header is
+      # required: Caddy routes by hostname.
+      #
+      # Verified: 200 with a workflow list. The public URL returns 302.
+      N8N_URL: http://${ENV_PREFIX_NAME:-prod-}caddy:80
+      N8N_HOST_HEADER: n8n.${DOMAIN:?DOMAIN is not set in .env}
       N8N_API_KEY: ${N8N_API_KEY:-}
     volumes:
       # /config is a WRITABLE volume, not a read-only bind, and that is a
