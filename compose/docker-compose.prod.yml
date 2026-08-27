@@ -590,6 +590,46 @@ services:
       # is reached through it, not around it.
       ANTHROPIC_BASE_URL: http://${ENV_PREFIX_NAME:-prod-}omniroute:20128
       ANTHROPIC_API_KEY: ${OMNIROUTE_API_KEY:?OMNIROUTE_API_KEY is not set in .env}
+      # `auto` — the router picks, including the free third-party pool.
+      #
+      # THIS IS A DELIBERATE REVERSAL, decided by the operator (ADR-0026).
+      # ADR-0018 and ADR-0021 kept the free providers unused on data-custody
+      # grounds. That reasoning was mine, not theirs, and they overruled it:
+      #
+      #   "an die fremden anbieter ist absolut richtig"
+      #   "nur bei sensiblen daten, also wirklich sensiblen am besten das
+      #    nicht; aber ich bin recht offen wohin meine daten gehen"
+      #   "also bitte nicht nur meine pro abo belasten"
+      #
+      # The practical argument is strong: on one subscription, cooldowns MOVE.
+      # Naming a model pins the agent to whichever one is locked next —
+      # opus-5 locked, so sonnet-5 was set, and sonnet-5 locked within the
+      # hour. `auto` steps around that by itself and spreads load off the
+      # subscription, which is what the operator asked for.
+      #
+      # ⚠️ `auto` WAS TRIED AND DOES NOT WORK FOR AGENTS — the reason is a
+      # missing capability, not reliability:
+      #
+      #     400 No target in combo auto supports tool calling;
+      #         request carried 29 tools
+      #
+      # Agent work IS tool calling. The free pool cannot do it, so `auto`
+      # cannot serve an agent no matter how much capacity it has. Measured
+      # separately: 463 stream failures from opencode against 6 from the
+      # subscription in one hour, plus a run that hung 62 minutes because a
+      # free provider accepted the request and then went silent mid-stream.
+      #
+      # The operator's instruction — spread load off the subscription, free
+      # providers are fine except for genuinely sensitive material — stands.
+      # It just cannot be met on this path. Where it CAN be met is anything
+      # without tools: summarisation, classification, drafting. That is worth
+      # revisiting as a per-task choice (ADR-0026).
+      # `subscription` is a COMBO defined in omniroute, not a model name: five
+      # subscription models tried in priority order, so a locked one is
+      # skipped instead of failing the run. Verified with 29 tools attached.
+      #
+      # This is what `auto` was supposed to do and could not — see above.
+      ANTHROPIC_MODEL: ${WORKER_MODEL:-subscription}
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       # PAPERCLIP_HOME. Not optional, and not obvious: the container ran for
