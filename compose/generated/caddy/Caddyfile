@@ -123,6 +123,23 @@ http://openclaw{$ENV_PREFIX}.{$DOMAIN} {
 	}
 }
 
+# ── options — Model-disagreement option arbitrage study (M18, agent-built)
+#    access: public
+#    networks: apps
+http://options{$ENV_PREFIX}.{$DOMAIN} {
+	# Upstream is the container name, resolved by Docker's embedded DNS.
+	# {$ENV_PREFIX_NAME} yields e.g. "prod-" so the target is prod-options.
+	reverse_proxy {$ENV_PREFIX_NAME}options:8081 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto https
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
 # ── portfolio — Static personal site on the bare domain
 #    access: public
 #    networks: apps

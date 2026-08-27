@@ -61,6 +61,10 @@ ingress:
   - hostname: "openclaw${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
+  # options — Model-disagreement option arbitrage study (M18, agent-built) [access: public]
+  - hostname: "options${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
   # portfolio — Static personal site on the bare domain [access: public]
   - hostname: "${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80

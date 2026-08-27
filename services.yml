@@ -135,6 +135,30 @@ services:
     access: private
     enabled: true # M14
 
+  # ── options — the agent-built quant project (M18) ─────────────────────────
+  # A portfolio piece: the model-disagreement option arbitrage study. Built
+  # and deployed by the agent flotilla, which is itself part of the point.
+  #
+  # `access: public` — the operator asked for no Access gate, because a
+  # portfolio project nobody can open is not a portfolio project.
+  #
+  # WHAT MAKES THAT ACCEPTABLE, and what the agent must therefore respect:
+  #   - It serves a STATIC build: pre-computed results, charts, write-up.
+  #     No endpoint that runs a backtest on demand, because that is compute
+  #     any stranger could spend.
+  #   - `networks: [apps]` only. No Postgres, no Redis, nothing to steal.
+  #   - No credential inside it. Market data is fetched at BUILD time, and
+  #     whatever key that needs stays in .env, never in the image.
+  #
+  # If it ever needs to be dynamic, that is a new decision and a new ADR —
+  # not a quiet change to this entry.
+  - name: options
+    port: 8081
+    description: "Model-disagreement option arbitrage study (M18, agent-built)"
+    networks: [apps]
+    access: public
+    enabled: true # M18
+
   # ── THE ONLY PUBLIC SERVICE ON THIS HOST ──────────────────────────────────
   # A static portfolio on the bare domain. `access: public` is deliberate and
   # is the first such entry since whoami was removed in M11 — so it deserves

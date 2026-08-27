@@ -18,6 +18,7 @@ add or change a service there and run `make generate`.
 | `paperclip` | `paperclip.$DOMAIN` | `paperclip.dev.$DOMAIN` | 3100 | private | apps, data | `/` |
 | `dashboard` | `dashboard.$DOMAIN` | `dashboard.dev.$DOMAIN` | 8090 | private | apps, data | `/` |
 | `openclaw` | `openclaw.$DOMAIN` | `openclaw.dev.$DOMAIN` | 18789 | private | agent | `/` |
+| `options` | `options.$DOMAIN` | `options.dev.$DOMAIN` | 8081 | public | apps | `/` |
 | `portfolio` | `portfolio.$DOMAIN` | `portfolio.dev.$DOMAIN` | 8080 | public | apps | `/` |
 | `status` | `status.$DOMAIN` | `status.dev.$DOMAIN` | 3001 | private | apps | `/` |
 | `ntfy` | `ntfy.$DOMAIN` | `ntfy.dev.$DOMAIN` | 80 | private | apps | `/` |
