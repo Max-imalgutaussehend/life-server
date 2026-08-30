@@ -22,14 +22,61 @@
 #   the ntfy publish token — the ability to forge an all-clear. Reporting
 #   outward keeps the connection direction agent -> apps and widens nothing.
 #
-# COST
-#   One minimal completion per hour, ~24/day. Negligible against a subscription,
-#   and the alternative is discovering the outage days late.
+# COST — AND WHY THIS NO LONGER SPENDS SUBSCRIPTION TOKENS (M18, ADR-0027)
+#   This loop used to send a real completion against tier 1 every hour: ~24/day
+#   charged to the Pro subscription whether or not the operator used an agent.
+#   That was the only thing consuming the plan while the system sat idle, and
+#   the operator asked for it to stop:
+#
+#     "ensure none of the agents is using the claude pro subscription to run,
+#      no heartbeat and nothing. so if i dont use my agents for a day there is
+#      no consumption in my claude pro sub"
+#
+#   HEARTBEAT_MODE selects where the hourly check is billed:
+#
+#     router (default) — a real completion, sent THROUGH OMNIROUTE against the
+#                        tier-2 model. Still a genuine model round-trip, so it
+#                        still detects the expiry; the tokens land on the
+#                        direct API key instead of the subscription.
+#     full             — the old behaviour: tier 1 directly, on the plan.
+#     off              — report nothing, spend nothing, monitor nothing.
+#
+#   A REJECTED ALTERNATIVE, RECORDED SO IT IS NOT RETRIED: checking
+#   ${PROXY}/v1/models instead. It is free, and it is useless here. cliproxy
+#   answers that from its own static model list without contacting Anthropic —
+#   which is why a wrong model id returns 502 rather than an upstream error —
+#   and the credential it validates is PROXY_API_KEY, a fixed string in .env
+#   that cannot expire. The OAuth credential in the cliproxy_data volume, the
+#   one that DOES expire in ~7 days, is never exercised. That check reports
+#   healthy throughout the outage it exists to catch: precisely the failure
+#   "WHY NOT AN ORDINARY HTTP CHECK" above rejects.
 # =============================================================================
 set -u
 
 PROXY="http://${PROXY_HOST:-cliproxy}:8317"
 INTERVAL="${HEARTBEAT_INTERVAL:-3600}"
+
+# auth | full | off — see the COST section above. Default `auth`: token-free.
+HEARTBEAT_MODE="${HEARTBEAT_MODE:-router}"
+
+case "$HEARTBEAT_MODE" in
+	router|full|off) ;;
+	*)
+		# Fail closed, and fail LOUDLY. Silently falling back to `full` on a
+		# typo would restore the exact hourly spend this mode exists to stop.
+		echo "heartbeat: HEARTBEAT_MODE='${HEARTBEAT_MODE}' is not one of router|full|off" >&2
+		exit 1
+		;;
+esac
+
+if [ "$HEARTBEAT_MODE" = off ]; then
+	echo "heartbeat: HEARTBEAT_MODE=off — credential is NOT monitored, and no"
+	echo "           tokens are spent. An expired credential will surface as"
+	echo "           agents that silently stop working (M10)."
+	# sleep forever rather than exit: `restart: unless-stopped` would otherwise
+	# restart this container in a tight loop.
+	while true; do sleep 86400; done
+fi
 
 # Without a push URL there is nothing to report to. That is a misconfiguration,
 # not a reason to spin: exit loudly so `docker logs` says why.
@@ -75,19 +122,51 @@ fi
 echo "heartbeat: reporting to Kuma every ${INTERVAL}s"
 
 while true; do
-	# max_tokens:1 — the cheapest request that still forces authentication and
-	# a model round-trip. A malformed or unauthenticated request fails at the
-	# proxy and never reaches the model, which is exactly what must be caught.
-	# The model id must be one the proxy actually lists at /v1/models. A bare
-	# "claude-sonnet-4-5" is NOT among them and returns 502 — verified
-	# 2026-08-02, after that guessed id made a working proxy look broken.
-	body='{"model":"claude-sonnet-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
-
-	code="$(wget -qO- --server-response --timeout=60 \
-		--header="Content-Type: application/json" \
-		--header="Authorization: Bearer ${PROXY_API_KEY}" \
-		--post-data="$body" \
-		"${PROXY}/v1/chat/completions" 2>&1 | awk '/^  HTTP/{print $2; exit}')"
+	case "$HEARTBEAT_MODE" in
+	full)
+		# Tier 1 DIRECTLY. Spends subscription tokens — the pre-M18 behaviour,
+		# now opt-in only.
+		#
+		# max_tokens:1 — the cheapest request that still forces authentication
+		# and a model round-trip. The model id must be one the proxy actually
+		# lists at /v1/models. A bare "claude-sonnet-4-5" is NOT among them and
+		# returns 502 — verified 2026-08-02, after that guessed id made a
+		# working proxy look broken.
+		body='{"model":"claude-sonnet-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
+		code="$(wget -qO- --server-response --timeout=60 \
+			--header="Content-Type: application/json" \
+			--header="Authorization: Bearer ${PROXY_API_KEY}" \
+			--post-data="$body" \
+			"${PROXY}/v1/chat/completions" 2>&1 | awk '/^  HTTP/{print $2; exit}')"
+		;;
+	router)
+		# THE DEFAULT (M18, ADR-0027). A real completion — so it still catches
+		# the expiry that a local endpoint cannot — but sent THROUGH OMNIROUTE
+		# against the tier-2 model, so the tokens are billed to the direct API
+		# key rather than to the Pro subscription.
+		#
+		# WHY NOT A TOKEN-FREE GET. An earlier version of this file checked
+		# ${PROXY}/v1/models and claimed it cost nothing and still caught the
+		# expiry. It does cost nothing, and it does NOT catch the expiry:
+		# cliproxy serves that list from its own static config (that is how a
+		# wrong model id yields 502 rather than an upstream error), and the key
+		# it validates is PROXY_API_KEY — a fixed string in .env that never
+		# expires. It never contacts Anthropic at all. It would have reported
+		# healthy straight through the outage this monitor exists for, which is
+		# exactly the trap "WHY NOT AN ORDINARY HTTP CHECK" above warns about.
+		#
+		# ⚠️ REQUIRES TIER 2 TO BE KEYED. With ANTHROPIC_API_KEY empty, omniroute
+		# has only tier 1 and this falls back onto the subscription — i.e. it
+		# silently becomes `full`. verify-subscription-load.sh checks for that
+		# combination and fails on it.
+		body='{"model":"'"${HEARTBEAT_MODEL:-anthropic/claude-sonnet-5}"'","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}'
+		code="$(wget -qO- --server-response --timeout=60 \
+			--header="Content-Type: application/json" \
+			--header="Authorization: Bearer ${OMNIROUTE_API_KEY:-}" \
+			--post-data="$body" \
+			"${OMNIROUTE}/v1/chat/completions" 2>&1 | awk '/^  HTTP/{print $2; exit}')"
+		;;
+	esac
 
 	report_omniroute
 

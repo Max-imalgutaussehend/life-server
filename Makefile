@@ -200,6 +200,10 @@ verify-agent-sandbox: ## [M9] Prove agent sessions cannot reach the data layer
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
 		'ENV_PREFIX_NAME=$(ENV_PREFIX_NAME) bash /opt/life-server/scripts/verify-agent-sandbox.sh'
 
+.PHONY: verify-subscription-load
+verify-subscription-load: ## Check agent load is off the Pro subscription (local, no SSH)
+	@./scripts/verify-subscription-load.sh
+
 .PHONY: migrate
 migrate: ## [M9] Apply SQL migrations (DB=paperclip, MODE=--status|--dry-run)
 	@test -n "$(DB)" || { echo "$(ERR)DB= is required, e.g. make migrate DB=paperclip$(OFF)"; exit 1; }

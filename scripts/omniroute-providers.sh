@@ -48,6 +48,11 @@ get() { grep -E "^$1=" "$REPO/.env" | head -1 | cut -d= -f2-; }
 PW="$(get OMNIROUTE_INITIAL_PASSWORD)"
 PROXY_KEY="$(get PROXY_API_KEY)"
 CLAW_KEY="$(get OMNIROUTE_API_KEY)"
+# Tier 2. Empty is a supported state, not an error: the node and connection are
+# still created, but the connection is created DISABLED, so the router keeps
+# using tier 1 alone. That is ADR-0021's "inert until keyed" — expressed as a
+# provisioning outcome rather than a hand-edited JSON flag.
+ANTHROPIC_KEY="$(get ANTHROPIC_API_KEY)"
 
 [[ -n "$PW" ]] || { echo "error: OMNIROUTE_INITIAL_PASSWORD not in .env" >&2; exit 1; }
 
@@ -59,13 +64,14 @@ CLAW_KEY="$(get OMNIROUTE_API_KEY)"
 # do not land in `ps` output or the server's shell history.
 ssh "${SSH_OPTS[@]}" "$SERVER" \
 	PREFIX="$PREFIX" PW="$PW" PROXY_KEY="$PROXY_KEY" CLAW_KEY="$CLAW_KEY" \
+	ANTHROPIC_KEY="$ANTHROPIC_KEY" \
 	'bash -s' <<'REMOTE'
 set -euo pipefail
 # ssh sets these as shell variables, not exported ones, and `docker run -e VAR`
 # reads the ENVIRONMENT. Without this the container gets empty strings and the
 # login silently fails — which is exactly how this script produced no output at
 # all on its first run.
-export PREFIX PW PROXY_KEY CLAW_KEY
+export PREFIX PW PROXY_KEY CLAW_KEY ANTHROPIC_KEY
 
 # The inner script is written to a file FIRST and fed to the container from
 # there. Piping it as a heredoc would make it share stdin with the outer
@@ -125,6 +131,58 @@ EOF
 	fi
 fi
 
+# ── tier 2: Anthropic direct (ADR-0021) ───────────────────────────────────
+# WHY THIS EXISTS: with tier 1 alone, every agent turn is charged to the Pro
+# subscription. That is the whole complaint — the router cannot spread load it
+# has nowhere to spread it TO. A second tier is the only thing that changes
+# where the tokens are billed.
+#
+# It is NOT the free-provider pool. That was tried and is incapable of the
+# work: "400 No target in combo auto supports tool calling; request carried 29
+# tools". Agent work is tool calling, so free tiers cannot serve these agents
+# at any price. See the `auto` comment in docker-compose.prod.yml.
+#
+# UNKEYED IS A NORMAL OUTCOME. If ANTHROPIC_API_KEY is empty the connection is
+# created but left disabled, and this script says so instead of failing. The
+# router then behaves exactly as it does today.
+if api GET /api/provider-nodes | grep -q '"name":"anthropic-direct"'; then
+	echo "node anthropic-direct: exists"
+else
+	cat > /tmp/node2.json <<EOF
+{"type":"anthropic","name":"anthropic-direct","apiType":"messages","prefix":"anthropic",
+ "baseUrl":"https://api.anthropic.com/v1",
+ "chatPath":"/messages","modelsPath":"/models"}
+EOF
+	echo "node anthropic-direct: $(api POST /api/provider-nodes /tmp/node2.json | head -c 300)"
+fi
+
+NODE2_ID=$(api GET /api/provider-nodes \
+	| sed 's/},{/}\n{/g' | grep '"name":"anthropic-direct"' \
+	| sed 's/.*"id":"\([^"]*\)".*/\1/' | head -1)
+
+if [ -n "${NODE2_ID:-}" ]; then
+	if api GET /api/providers | grep -q '"name":"anthropic-direct"'; then
+		echo "connection anthropic-direct: exists"
+	else
+		# `enabled` tracks whether a key was supplied. A provider enabled with
+		# an empty credential turns a clean fallback into an auth error and
+		# hides the real cause — the failure mode omniroute/README.md warns of.
+		if [ -n "${ANTHROPIC_KEY:-}" ]; then EN=true; else EN=false; fi
+		cat > /tmp/conn2.json <<EOF
+{"provider":"$NODE2_ID","name":"anthropic-direct","apiKey":"$ANTHROPIC_KEY","enabled":$EN}
+EOF
+		echo "connection anthropic-direct (enabled=$EN): $(api POST /api/providers /tmp/conn2.json | head -c 400)"
+	fi
+fi
+
+if [ -z "${ANTHROPIC_KEY:-}" ]; then
+	echo
+	echo "!! TIER 2 IS NOT KEYED — ANTHROPIC_API_KEY is empty in .env."
+	echo "!! Every agent request is therefore still billed to the Pro"
+	echo "!! subscription. Set it in .env on this machine and re-run."
+	echo
+fi
+
 # ── the bearer OpenClaw presents ──────────────────────────────────────────
 if api GET /api/keys | grep -q '"name":"openclaw"'; then
 	echo "key openclaw: exists"
@@ -142,7 +200,7 @@ echo "models:      $(api GET /api/models       | head -c 220)"
 INNER
 
 docker run --rm --network "container:${PREFIX}omniroute" \
-	-e PW -e PROXY_KEY -e CLAW_KEY -e PREFIX \
+	-e PW -e PROXY_KEY -e CLAW_KEY -e PREFIX -e ANTHROPIC_KEY \
 	-v /tmp/omniroute-provision.sh:/provision.sh:ro \
 	alpine:3.21 sh /provision.sh
 rm -f /tmp/omniroute-provision.sh
