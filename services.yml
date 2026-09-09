@@ -206,3 +206,26 @@ services:
     networks: [apps]
     access: private
     enabled: true # M8
+
+  # ── longevity — Health Score Platform (DHBW MVP) ──────────────────────────
+  # A web app that aggregates health data into a 0–100 score and lets users
+  # share only a score band with partners via signed tokens.
+  #
+  # Split routing: /api/* -> longevity-api (Fastify, port 3000)
+  #                rest   -> longevity    (Nginx serving Vite build, port 80)
+  #
+  # Both containers are deployed from GHCR images built by the LONGEVITY repo's
+  # own CI. The compose service is in docker-compose.prod.yml; postgres is
+  # provisioned via POSTGRES_SERVICES += longevity.
+  #
+  # `access: public` — the app has its own session-cookie auth; the verify
+  # endpoint (/verify/:id) must work in a stranger's browser without any
+  # Cloudflare Access challenge.
+  - name: longevity
+    port: 8082
+    api_port: 3000
+    description: "LONGEVITY — Health Score Platform (DHBW MVP)"
+    networks: [apps, data]
+    access: public
+    healthcheck: /api/healthz
+    enabled: true

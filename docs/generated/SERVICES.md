@@ -22,6 +22,7 @@ add or change a service there and run `make generate`.
 | `portfolio` | `portfolio.$DOMAIN` | `portfolio.dev.$DOMAIN` | 8080 | public | apps | `/` |
 | `status` | `status.$DOMAIN` | `status.dev.$DOMAIN` | 3001 | private | apps | `/` |
 | `ntfy` | `ntfy.$DOMAIN` | `ntfy.dev.$DOMAIN` | 80 | private | apps | `/` |
+| `longevity` | `longevity.$DOMAIN` | `longevity.dev.$DOMAIN` | 8082 | public | apps, data | `/api/healthz` |
 
 ## Declared, not yet deployed
 

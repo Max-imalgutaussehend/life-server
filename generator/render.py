@@ -173,6 +173,18 @@ def load_services() -> list[dict]:
                 )
             seen_ports[port] = name
 
+        # api_port: optional. When set, the generated Caddy block sends /api/*
+        # to a separate <name>-api container on this port, and all other paths
+        # to the main container on `port`. Used by services that bundle a
+        # backend and a frontend under one hostname (e.g. longevity).
+        api_port = svc.get("api_port")
+        if api_port is not None and (
+            not isinstance(api_port, int) or not (1 <= api_port <= 65535)
+        ):
+            raise RegistryError(
+                f"{where} ({name}): 'api_port' must be an int 1-65535"
+            )
+
         result.append(
             {
                 "name": name,
@@ -184,6 +196,7 @@ def load_services() -> list[dict]:
                 "healthcheck": svc.get("healthcheck", "/"),
                 "enabled": enabled,
                 "apex": apex,
+                "api_port": api_port,
                 # Uppercased name for env var keys: n8n -> N8N
                 "env_key": name.upper().replace("-", "_"),
             }

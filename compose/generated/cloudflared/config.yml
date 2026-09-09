@@ -80,6 +80,10 @@ ingress:
   - hostname: "ntfy${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
+  # longevity — LONGEVITY — Health Score Platform (DHBW MVP) [access: public]
+  - hostname: "longevity${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
   # Catch-all. Required by cloudflared: the last rule must have no hostname.
   # Anything not matched above is refused rather than silently routed.
   - service: http_status:404
