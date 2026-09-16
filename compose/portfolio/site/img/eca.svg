@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Icon: a speech bubble with a sentiment waveform inside, next to a flat trend line">
+  <!--
+    eca.svg — icon for earnings-call-alpha.
+
+    A speech bubble (the call transcript) with a sentiment waveform inside,
+    next to a flat, near-zero trend line (the abnormal-return signal the
+    paper predicts — which this reproduction found was not there at n=16).
+
+    The flat line is the point: most project icons would show a rising
+    trend to imply a working result. This one shows the honest null.
+
+    Same belt-and-braces colour approach as cbar.svg: presentation
+    attributes plus a stylesheet, so dark mode works even where the media
+    query is stripped.
+  -->
+  <style>
+    .frame { stroke: #d4d4d8; }
+    .bubble { stroke: #a1a1aa; }
+    .wave   { stroke: #71717a; }
+    .flat   { stroke: #18181b; }
+    .dot    { fill: #18181b; }
+    @media (prefers-color-scheme: dark) {
+      .frame  { stroke: #3f3f46; }
+      .bubble { stroke: #71717a; }
+      .wave   { stroke: #8b8b93; }
+      .flat   { stroke: #e8e8e6; }
+      .dot    { fill: #e8e8e6; }
+    }
+  </style>
+
+  <rect class="frame" x="16" y="16" width="168" height="168" rx="14"
+        fill="none" stroke="#d4d4d8" stroke-width="6" />
+
+  <!-- speech bubble outline, tail bottom-left -->
+  <path class="bubble" d="M40 54h84a14 14 0 0 1 14 14v40a14 14 0 0 1-14 14H86l-18 16v-16h-28a14 14 0 0 1-14-14V68a14 14 0 0 1 14-14z"
+        fill="none" stroke="#a1a1aa" stroke-width="6" stroke-linejoin="round" />
+
+  <!-- sentiment waveform inside the bubble -->
+  <path class="wave" d="M48 92l14-18 12 26 14-32 12 20 10-12"
+        fill="none" stroke="#71717a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- the honest flat result line, below the bubble -->
+  <line class="flat" x1="40" y1="150" x2="160" y2="150"
+        stroke="#18181b" stroke-width="6" stroke-linecap="round" />
+  <circle class="dot" cx="160" cy="150" r="7" fill="#18181b" />
+</svg>
