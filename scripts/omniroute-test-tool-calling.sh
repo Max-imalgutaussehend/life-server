@@ -38,7 +38,7 @@ set -euo pipefail
 
 MODEL="${1:?usage: omniroute-test-tool-calling.sh <model-id>}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/life-server}"
-SERVER="${SERVER:-deploy@62.238.4.64}"
+SERVER="${SERVER:?set SERVER=deploy@<host-ip>}"
 
 # No local .env check: unlike deploy.sh, this reads OMNIROUTE_API_KEY from the
 # server's own .env over SSH and never touches a local copy.
