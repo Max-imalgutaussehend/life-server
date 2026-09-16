@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Icon: two server racks on separate networks, linked by one guarded connection">
+  <!--
+    life-server.svg — icon for the life-server project.
+
+    Two server racks (the data network and the agent network) drawn apart
+    rather than touching, linked by exactly one line that passes through a
+    small diamond gate — the sandbox boundary the repo actually tests
+    (make verify-agent-sandbox). One controlled link, not an open mesh, is
+    the entire point of the architecture, so the icon draws only that.
+
+    Same colour scheme as the other project icons for a consistent row.
+  -->
+  <style>
+    .frame { stroke: #d4d4d8; }
+    .rack  { stroke: #71717a; }
+    .slot  { fill: #a1a1aa; }
+    .gate  { stroke: #18181b; fill: #18181b; }
+    @media (prefers-color-scheme: dark) {
+      .frame { stroke: #3f3f46; }
+      .rack  { stroke: #8b8b93; }
+      .slot  { fill: #71717a; }
+      .gate  { stroke: #e8e8e6; fill: #e8e8e6; }
+    }
+  </style>
+
+  <rect class="frame" x="16" y="16" width="168" height="168" rx="14"
+        fill="none" stroke="#d4d4d8" stroke-width="6" />
+
+  <!-- rack 1, top-left: data network -->
+  <rect class="rack" x="34" y="40" width="60" height="34" rx="4"
+        fill="none" stroke="#71717a" stroke-width="6" />
+  <circle class="slot" cx="46" cy="57" r="4" fill="#a1a1aa" />
+
+  <!-- rack 2, bottom-right: agent network -->
+  <rect class="rack" x="106" y="126" width="60" height="34" rx="4"
+        fill="none" stroke="#71717a" stroke-width="6" />
+  <circle class="slot" cx="118" cy="143" r="4" fill="#a1a1aa" />
+
+  <!-- the one guarded link between them -->
+  <line class="gate" x1="94" y1="74" x2="106" y2="126"
+        stroke="#18181b" stroke-width="6" stroke-linecap="round" />
+  <rect class="gate" x="93" y="93" width="14" height="14" rx="2"
+        fill="#18181b" stroke="#18181b" stroke-width="2"
+        transform="rotate(45 100 100)" />
+</svg>

@@ -37,7 +37,7 @@
 set -euo pipefail
 
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/life-server}"
-SERVER="${SERVER:-deploy@62.238.4.64}"
+SERVER="${SERVER:?set SERVER=deploy@<host-ip>}"
 REMOTE_REPO="${REMOTE_REPO:-/srv/restic}"
 LOCAL_REPO="${LOCAL_REPO:-$HOME/life-server-backups/restic}"
 

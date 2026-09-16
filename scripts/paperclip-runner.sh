@@ -35,7 +35,7 @@ SSH_KEY="${SSH_KEY:-$HOME/.ssh/life-server}"
 # a tilde inside a variable is not expanded by the shell. Without this, every
 # invocation through make fails with "no SSH key" while the file is right there.
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
-SERVER_IP="${SERVER_IP:-62.238.4.64}"
+SERVER_IP="${SERVER_IP:?set SERVER_IP=<host-ip>}"
 PG_CONTAINER="${PG_CONTAINER:-prod-postgres}"
 
 # Three at once, per the operator. A subscription has rate limits and an

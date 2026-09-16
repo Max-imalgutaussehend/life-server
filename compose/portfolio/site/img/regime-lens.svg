@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Icon: a time series passing through a lens and separating into two clusters">
+  <!--
+    regime-lens.svg — icon for regime-lens.
+
+    A time series enters from the left, passes through a lens (the
+    foundation model's embedding space), and comes out the other side split
+    into two distinct clusters — calm regime vs. crisis regime. The lens
+    literally re-frames the series into something separable.
+
+    Same colour scheme as cbar.svg / eca.svg for a consistent project row.
+  -->
+  <style>
+    .frame  { stroke: #d4d4d8; }
+    .series { stroke: #71717a; }
+    .lens   { stroke: #a1a1aa; }
+    .calm   { fill: #a1a1aa; }
+    .crisis { fill: #18181b; }
+    @media (prefers-color-scheme: dark) {
+      .frame  { stroke: #3f3f46; }
+      .series { stroke: #8b8b93; }
+      .lens   { stroke: #71717a; }
+      .calm   { fill: #71717a; }
+      .crisis { fill: #e8e8e6; }
+    }
+  </style>
+
+  <rect class="frame" x="16" y="16" width="168" height="168" rx="14"
+        fill="none" stroke="#d4d4d8" stroke-width="6" />
+
+  <!-- incoming time series -->
+  <path class="series" d="M28 108l16-6 14 10 16-20 14 14"
+        fill="none" stroke="#71717a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- the lens -->
+  <circle class="lens" cx="100" cy="100" r="30" fill="none" stroke="#a1a1aa" stroke-width="6" />
+  <line class="lens" x1="122" y1="122" x2="132" y2="132" stroke="#a1a1aa" stroke-width="6" stroke-linecap="round" />
+
+  <!-- two output clusters: calm (outline dots) vs crisis (solid dots) -->
+  <circle class="calm" cx="150" cy="66" r="5" fill="#a1a1aa" />
+  <circle class="calm" cx="164" cy="76" r="5" fill="#a1a1aa" />
+  <circle class="calm" cx="152" cy="82" r="5" fill="#a1a1aa" />
+
+  <circle class="crisis" cx="152" cy="128" r="6" fill="#18181b" />
+  <circle class="crisis" cx="168" cy="140" r="6" fill="#18181b" />
+  <circle class="crisis" cx="150" cy="148" r="6" fill="#18181b" />
+</svg>
