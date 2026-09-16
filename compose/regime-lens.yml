@@ -1,0 +1,62 @@
+# =============================================================================
+# regime-lens.yml — TEMPORARY: regime-lens started outside the main compose
+# file.
+# =============================================================================
+#
+# WHY THIS FILE EXISTS, AND WHY IT SHOULD NOT
+#   Same situation as earnings-alpha (see compose/earnings-alpha.yml for the
+#   full explanation): docker-compose.prod.yml has a `regime-lens` service
+#   block already, but `docker compose up` interpolates the WHOLE file before
+#   filtering by service, and fails on LONGEVITY_SIGNING_KEY_PRIVATE being
+#   unset in .env — a pre-existing gap unrelated to this service, not faked
+#   to unblock it.
+#
+#   This file starts ONLY regime-lens, referencing the same external `apps`
+#   network the main stack already created.
+#
+# HOW TO RETIRE THIS FILE
+#   Once LONGEVITY_SIGNING_KEY_PRIVATE (and whatever else is missing) is set
+#   in .env: `docker compose -f regime-lens.yml down`, then bring regime-lens
+#   up through docker-compose.prod.yml as normal (its service block is
+#   already there, unchanged) and delete this file.
+# =============================================================================
+services:
+  regime-lens:
+    image: ghcr.io/max-imalgutaussehend/regime-lens@sha256:08d125668c592e80d5496dc1b2dda32e3e6b11e9ff52a8bfed624d2e03ebbb1d
+    container_name: ${ENV_PREFIX_NAME:-prod-}regime-lens
+    restart: unless-stopped
+    volumes:
+      # Relative to THIS file's directory (compose/), not the repo root —
+      # the config lives at repo-root/regime-lens/, one level up.
+      - ../regime-lens/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../regime-lens/index.html:/usr/share/nginx/html/index.html:ro
+      - ../regime-lens/favicon.svg:/usr/share/nginx/html/favicon.svg:ro
+    networks:
+      - apps
+    healthcheck:
+      # 127.0.0.1, not localhost: `localhost` resolves to ::1 first inside
+      # this image and nginx only listens on IPv4, so a `localhost` healthcheck
+      # reports unhealthy while the service is actually fine — reproduced and
+      # confirmed locally before writing this. earnings-alpha has the same fix
+      # applied too, see that file.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8084/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  apps:
+    name: ${ENV_PREFIX_NAME:-prod-}net-apps
+    external: true

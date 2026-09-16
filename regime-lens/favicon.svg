@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!--
+    favicon.svg — regime-lens.maxrommel.de
+    A lens shape (vesica) with a simple stepped line through the middle —
+    reads as "regimes" (discrete steps) seen through a lens. Same
+    construction as maxrommel.de's own favicon.svg: geometric strokes,
+    theme-aware via currentColor, square caps/miter joins, an 8-unit stroke
+    on a 64-unit viewBox so the shape survives being scaled to 16px — the
+    first version of this icon used a thinner stroke and finer inner detail
+    and both disappeared at tab-icon size.
+  -->
+  <style>
+    path { stroke: #1a1a1a; }
+    @media (prefers-color-scheme: dark) { path { stroke: #e8e8e6; } }
+  </style>
+  <path d="M32 8 C 46 22, 46 42, 32 56 C 18 42, 18 22, 32 8 Z"
+        fill="none"
+        stroke="#1a1a1a"
+        stroke-width="8"
+        stroke-linecap="square"
+        stroke-linejoin="miter" />
+  <path d="M22 40 H30 V26 H42"
+        fill="none"
+        stroke="#1a1a1a"
+        stroke-width="6"
+        stroke-linecap="square"
+        stroke-linejoin="miter" />
+</svg>

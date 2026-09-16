@@ -27,6 +27,47 @@
 #
 # It talks to the container over docker exec on the server, so it needs the
 # same SSH access deploy.sh uses and no published port.
+#
+# A COMBO THIS SCRIPT DOES NOT MANAGE, FOUND LIVE ON THE SERVER (2026-09-13)
+#   A combo named "free-first" exists in the router's SQLite state, created
+#   directly via the API/dashboard rather than through this script — its
+#   description even cited "ADR-0030", which does not exist in this repo.
+#   OpenClaw's agent (agents.defaults.model.primary) was pointed at
+#   `omniroute/free-first`, overriding the `subscription` combo this repo's
+#   compose file sets everywhere else.
+#
+#   ADR-0026 already measured why a free-provider pool cannot serve agents:
+#   463 stream failures/hour against 6 from the subscription, plus a run that
+#   hung 62 minutes when a free provider accepted a request and went silent.
+#   Consistent with that, by 2026-09-13 every one of free-first's 8 providers
+#   was dead: nvidia/cerebras/openrouter/gemini had models retired by their
+#   provider (404/410 — permanent), sambanova had no credentials configured,
+#   and cohere/zai/mistral were quota/balance/rate-limit exhausted (429).
+#
+#   Fixed in place (not by this script, for the same reason state can't be
+#   read back into it below): pruned free-first down to cohere/zai/mistral —
+#   the three that can recover without a config change — via
+#   PUT /api/combos/{id}. nvidia/cerebras/openrouter/gemini/sambanova were
+#   removed since they cannot ever succeed again as configured.
+#
+#   This script still does not manage free-first or touch OpenClaw's model
+#   selection — both remain dashboard/API-set state, invisible to `git diff`.
+#   If free-first is to stay, it belongs here, provisioned like the two combos
+#   below. Until then, treat any drift between what's live and what this file
+#   describes as expected, not a bug in this script.
+#
+#   TOOL-CALLING ON THE REMAINING THREE, MEASURED DIRECTLY (2026-09-13)
+#   The operator disputed ADR-0026's claim that the free pool can't do tool
+#   calling. Tested by sending a real tools-array chat request straight to
+#   omniroute for each of cohere/command-a-03-2025, zai/glm-5-turbo, and
+#   mistral/mistral-small-latest. Result: all three returned 429 (cohere trial
+#   quota, zai zero balance, mistral rate-limited) — none reached the model,
+#   so **this did not confirm or refute tool-calling support**. The 429s were
+#   not caused by the test; the same three accounts were already saturated by
+#   free-first's live OpenClaw traffic at the time. Re-run this test —
+#   scripts stashed nowhere permanent, see git history around this comment
+#   for the curl shape — once one of the three has quota again, before
+#   concluding either way.
 # =============================================================================
 set -euo pipefail
 

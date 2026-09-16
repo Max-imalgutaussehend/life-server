@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regime Lens — Ergebnisse</title>
+<link rel="icon" href="/favicon.png?v=2" type="image/png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #f7f6f3; --bg-raised: #ffffff; --ink: #1c1e24; --ink-soft: #3a3d45;
+  --muted: #6b7078; --faint: #9a9da3; --accent: #a8722f; --accent-soft: #f0e4d3;
+  --accent-ink: #6e4a1c; --line: #ddd9d0; --line-strong: #c7c2b8; --code-bg: #eeece6;
+  --calm: #4a7c6e; --calm-soft: #dfeae5; --new: #a8722f; --new-soft: #f0e4d3;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: 'Inter', system-ui, sans-serif; line-height: 1.6; margin: 0; }
+.page { max-width: 980px; margin: 0 auto; padding: 3.5rem 1.75rem 5rem; }
+.eyebrow { font-family: 'JetBrains Mono', monospace; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 1rem; }
+h1 { font-family: 'Source Serif 4', Georgia, serif; font-weight: 600; font-size: clamp(1.9rem, 4vw, 2.5rem); line-height: 1.15; margin: 0 0 .8rem; text-wrap: balance; }
+.dek { font-size: 1.05rem; color: var(--ink-soft); max-width: 62ch; }
+section { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--line); }
+h2 { font-family: 'Source Serif 4', Georgia, serif; font-size: 1.35rem; margin: 0 0 1rem; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .87rem; min-width: 640px; }
+thead th { text-align: left; font-family: 'JetBrains Mono', monospace; font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 0 .8rem .6rem; border-bottom: 1px solid var(--line-strong); }
+tbody td { padding: .7rem .8rem; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+tbody tr.is-new { background: var(--new-soft); }
+tbody td:first-child { font-weight: 600; }
+.tag { font-family: 'JetBrains Mono', monospace; font-size: .64rem; padding: .1em .5em; border-radius: 5px; background: var(--new-soft); color: var(--accent-ink); margin-left: .5em; }
+.empty { background: var(--bg-raised); border: 1px dashed var(--line-strong); border-radius: 10px; padding: 2rem; color: var(--muted); font-size: .95rem; }
+.empty code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: .15em .4em; border-radius: 4px; }
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.stat { background: var(--bg-raised); border: 1px solid var(--line); border-radius: 9px; padding: .9rem 1.1rem; flex: 1 1 180px; }
+.stat-label { font-family: 'JetBrains Mono', monospace; font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: .3rem; }
+.stat-value { font-size: 1.15rem; font-weight: 600; }
+.universe-list { font-size: .9rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Regime Lens · Ergebnis-Dashboard</div>
+  <h1>Marktregime aus TimesFM-Embeddings vs. klassische Methoden</h1>
+  <p class="dek">Vergleich von Hidden-Markov-Modellen, Markov-Switching, Changepoint-Detection und Volatilitäts-Schwellenwerten gegen Cluster auf den internen Repräsentationen von TimesFM und Chronos — bewertet über Krisenfenster-Overlap, Cluster-Qualität und einen ökonomischen Overlay-Backtest.</p>
+
+  
+
+  <section>
+    <h2>Universum</h2>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Assets</div><div class="stat-value">7</div></div>
+      <div class="stat"><div class="stat-label">Methoden verglichen</div><div class="stat-value">6</div></div>
+    </div>
+    <p class="universe-list">S&P 500, VIX, 20+Y Treasury ETF, Gold ETF, Oil ETF, Apple, JPMorgan</p>
+  </section>
+
+  <section>
+    <h2>Methodenvergleich (Durchschnitt über alle Assets)</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Methode</th>
+            <th>Krisenfenster F1</th>
+            <th>Cluster-Silhouette</th>
+            <th>Sharpe (Overlay)</th>
+            <th>Sharpe (Buy&amp;Hold)</th>
+            <th>Max Drawdown</th>
+            <th>Total Return</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+          <tr class="">
+            <td>Gaussian HMM</td>
+            <td>23.5%</td>
+            <td>—</td>
+            <td>0.52</td>
+            <td>0.49</td>
+            <td>-54.8%</td>
+            <td>1716.9%</td>
+          </tr>
+          
+          <tr class="">
+            <td>Markov-Switching</td>
+            <td>25.2%</td>
+            <td>—</td>
+            <td>0.61</td>
+            <td>0.49</td>
+            <td>-53.8%</td>
+            <td>1577.7%</td>
+          </tr>
+          
+          <tr class="">
+            <td>PELT Changepoint</td>
+            <td>33.0%</td>
+            <td>—</td>
+            <td>0.64</td>
+            <td>0.49</td>
+            <td>-45.2%</td>
+            <td>1364.6%</td>
+          </tr>
+          
+          <tr class="">
+            <td>Vol Threshold</td>
+            <td>30.8%</td>
+            <td>—</td>
+            <td>0.53</td>
+            <td>0.49</td>
+            <td>-40.7%</td>
+            <td>728.0%</td>
+          </tr>
+          
+          <tr class="is-new">
+            <td>TimesFM Embeddings<span class="tag">Foundation Model</span></td>
+            <td>14.3%</td>
+            <td>0.536</td>
+            <td>0.04</td>
+            <td>0.49</td>
+            <td>-37.3%</td>
+            <td>-3.3%</td>
+          </tr>
+          
+          <tr class="is-new">
+            <td>Chronos Embeddings<span class="tag">Foundation Model</span></td>
+            <td>18.6%</td>
+            <td>0.154</td>
+            <td>0.39</td>
+            <td>0.49</td>
+            <td>-39.6%</td>
+            <td>313.9%</td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+    
+    <p class="universe-list">Sharpe/Drawdown/Return-Spalten schließen VIX aus: Volatilitätsindizes sind nicht direkt handelbar und haben gelegentliche >100%-Tagesbewegungen, wodurch ein naiver Exposure-Overlay-Backtest darauf ökonomisch nicht aussagekräftig ist. Krisenfenster-F1 und Cluster-Silhouette beziehen alle Assets ein.</p>
+    
+  </section>
+
+  
+</div>
+</body>
+</html>

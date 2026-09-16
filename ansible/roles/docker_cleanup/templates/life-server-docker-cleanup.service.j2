@@ -1,0 +1,34 @@
+# Managed by Ansible (roles/docker_cleanup). Local edits are overwritten.
+#
+# Type=oneshot: runs to completion, non-zero exit shows up in
+# `systemctl --failed` and the journal (same pattern as life-server-backup).
+
+[Unit]
+Description=Remove Docker images no longer referenced by any container
+Documentation=file:///opt/life-server/docs/adr/0011-pinned-image-versions.md
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Plain `docker image prune -f` (no -a) only removes images with zero
+# containers referencing them — including stopped ones — so anything a
+# running or restart-pending container still needs is untouched. That is
+# deliberately weaker than -a: services that pin by digest (ADR-0011's M7
+# exception, e.g. longevity's GHCR images) get a new digest on every deploy
+# without ever retagging the old one, so the old image is exactly what this
+# is for. Found necessary 2026-09-12 when 39 stale longevity images filled
+# the disk to 100%.
+ExecStart=/usr/bin/docker image prune -f
+
+User=root
+
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=life-server-docker-cleanup

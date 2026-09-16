@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!--
+    favicon.svg — earnings-alpha.maxrommel.de
+    A speech bubble with a rising trend line inside it. Same construction as
+    maxrommel.de's own favicon.svg: geometric strokes, theme-aware via
+    currentColor, square caps/miter joins, an 8-unit stroke on a 64-unit
+    viewBox (same ratio as the reference) so it survives being scaled down
+    to a 16px tab icon.
+  -->
+  <style>
+    path { stroke: #1a1a1a; }
+    @media (prefers-color-scheme: dark) { path { stroke: #e8e8e6; } }
+  </style>
+  <path d="M12 16 H52 A4 4 0 0 1 56 20 V40 A4 4 0 0 1 52 44 H26 L16 52 V44 H12 A4 4 0 0 1 8 40 V20 A4 4 0 0 1 12 16 Z"
+        fill="none"
+        stroke="#1a1a1a"
+        stroke-width="8"
+        stroke-linecap="square"
+        stroke-linejoin="miter" />
+  <path d="M16 34 L26 24 L34 30 L48 16"
+        fill="none"
+        stroke="#1a1a1a"
+        stroke-width="8"
+        stroke-linecap="square"
+        stroke-linejoin="miter" />
+</svg>

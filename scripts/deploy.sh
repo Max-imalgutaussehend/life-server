@@ -128,3 +128,14 @@ ssh "${SSH_OPTS[@]}" "$SERVER" "
 echo "==> container status"
 ssh "${SSH_OPTS[@]}" "$SERVER" \
 	"docker ps --format 'table {{.Names}}\t{{.Status}}'"
+
+# Services pinned by digest (ADR-0011's M7 exception — longevity's images are
+# built and addressed by SHA) leave their previous image behind on every
+# deploy: `compose up -d` pulls the new digest but never removes the old one,
+# since nothing un-pins it first. Over enough deploys those pile up and fill
+# the disk (hit 100% on 2026-09-12 from ~39 stale longevity images). Plain
+# `docker image prune -f` only removes images with no container referencing
+# them, so anything still running — including the image compose just
+# started — is untouched.
+echo "==> pruning unreferenced images"
+ssh "${SSH_OPTS[@]}" "$SERVER" "docker image prune -f"

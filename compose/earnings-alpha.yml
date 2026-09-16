@@ -1,0 +1,66 @@
+# =============================================================================
+# earnings-alpha.yml — TEMPORARY: earnings-alpha started outside the main
+# compose file.
+# =============================================================================
+#
+# WHY THIS FILE EXISTS, AND WHY IT SHOULD NOT
+#   docker-compose.prod.yml already has an `earnings-alpha` service block
+#   (search for it there — this is not a second declaration, just a second
+#   way to start the same service). `docker compose up`, even with an
+#   explicit service name, interpolates every ${VAR} in the WHOLE file before
+#   filtering by service — so it fails on LONGEVITY_SIGNING_KEY_PRIVATE being
+#   unset in .env, a pre-existing gap unrelated to this service.
+#
+#   Faking that secret to unblock this was rejected: it's a real credential
+#   for a running production service (longevity-api's token signing), and a
+#   fake value there is a worse failure mode than compose refusing to start.
+#
+#   This file starts ONLY earnings-alpha, referencing the same external
+#   `apps` network the main stack already created, so it's reachable from
+#   Caddy exactly like every other apps-network service.
+#
+# HOW TO RETIRE THIS FILE
+#   Once LONGEVITY_SIGNING_KEY_PRIVATE (and whatever else is missing) is set
+#   in .env: `docker compose -f earnings-alpha.yml down`, then bring
+#   earnings-alpha up through docker-compose.prod.yml as normal (its service
+#   block is already there, unchanged) and delete this file.
+# =============================================================================
+services:
+  earnings-alpha:
+    image: ghcr.io/max-imalgutaussehend/earnings-call-alpha@sha256:7d4712c8e70365baa20e2f36600763b6fa89febbb83dcf9f86ae531acf870cd0
+    container_name: ${ENV_PREFIX_NAME:-prod-}earnings-alpha
+    restart: unless-stopped
+    volumes:
+      # Relative to THIS file's directory (compose/), not the repo root —
+      # the config lives at repo-root/earnings-alpha/, one level up.
+      - ../earnings-alpha/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../earnings-alpha/index.html:/usr/share/nginx/html/index.html:ro
+      - ../earnings-alpha/favicon.svg:/usr/share/nginx/html/favicon.svg:ro
+      - ../earnings-alpha/fonts:/usr/share/nginx/html/fonts:ro
+    networks:
+      - apps
+    healthcheck:
+      # 127.0.0.1, not localhost: localhost resolves to ::1 first inside this
+      # image and nginx only listens on IPv4, so this reported unhealthy while
+      # the service was actually fine.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8083/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  apps:
+    name: ${ENV_PREFIX_NAME:-prod-}net-apps
+    external: true

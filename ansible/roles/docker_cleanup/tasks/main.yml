@@ -1,0 +1,70 @@
+---
+# docker_cleanup — daily prune of unreferenced Docker images.
+#
+# WHY THIS IS A HOST-LEVEL TIMER AND NOT PART OF deploy.sh
+#   Not every service on this host is deployed by deploy.sh. longevity's own
+#   CI (a separate repo) pushes straight to /opt/life-server/longevity/ over
+#   SSH and runs its own `docker compose up -d` — deploy.sh never touches
+#   that path. A prune step added only to deploy.sh would silently not apply
+#   to it. Living here instead, on the host, catches every deploy path
+#   regardless of which repo or script produced it — the same reasoning as
+#   life-server-backup running independently of how data got into Postgres.
+#
+# WHY THIS IS NEEDED AT ALL
+#   ADR-0011 pins images by tag everywhere except the M7 digest exception for
+#   built-by-CI services (longevity). Each digest bump in .env makes
+#   `compose up -d` pull a new image without ever removing the old one —
+#   nothing un-pins it first. 2026-09-12: 39 accumulated longevity images had
+#   filled the 38G disk to 100%.
+#
+# WHY `docker image prune -f` AND NOT `-a`
+#   Without -a, prune only removes images with zero containers referencing
+#   them (including stopped containers) — it cannot touch whatever a running
+#   service is currently using, so this is safe to run unattended and never
+#   races a deploy. `-a` would additionally remove images that no container
+#   references YET but might be about to (e.g. a pull that hasn't started its
+#   container), which is unnecessary risk for a nightly job.
+
+- name: Install the docker-cleanup service unit
+  ansible.builtin.template:
+    src: life-server-docker-cleanup.service.j2
+    dest: /etc/systemd/system/life-server-docker-cleanup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install the daily docker-cleanup timer
+  ansible.builtin.template:
+    src: life-server-docker-cleanup.timer.j2
+    dest: /etc/systemd/system/life-server-docker-cleanup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Flush handlers so systemd sees the new units before enabling them
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start the docker-cleanup timer
+  when: not ansible_check_mode
+  ansible.builtin.systemd_service:
+    name: life-server-docker-cleanup.timer
+    enabled: true
+    state: started
+
+- name: Read the scheduled timer state
+  when: not ansible_check_mode
+  ansible.builtin.command:
+    cmd: systemctl list-timers --all --no-pager life-server-docker-cleanup.timer
+  register: docker_cleanup_timer_state
+  changed_when: false
+
+- name: Assert the docker-cleanup timer is scheduled
+  when: not ansible_check_mode
+  ansible.builtin.assert:
+    that: "'life-server-docker-cleanup.timer' in docker_cleanup_timer_state.stdout"
+    success_msg: "Docker cleanup timer is scheduled."
+    fail_msg: >-
+      life-server-docker-cleanup.timer is not scheduled. Check OnCalendar= in
+      /etc/systemd/system/life-server-docker-cleanup.timer.

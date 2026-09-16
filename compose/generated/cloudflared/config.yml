@@ -53,16 +53,16 @@ ingress:
   - hostname: "paperclip${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
-  # dashboard — System, services, agents and KPIs on one page (M17) [access: private]
-  - hostname: "dashboard${ENV_PREFIX}.${DOMAIN}"
-    service: http://${ENV_PREFIX_NAME}caddy:80
-
   # openclaw — OpenClaw Control — the agent's own web chat (M14) [access: private]
   - hostname: "openclaw${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
-  # options — Model-disagreement option arbitrage study (M18, agent-built) [access: public]
-  - hostname: "options${ENV_PREFIX}.${DOMAIN}"
+  # earnings-alpha — Earnings-call sentiment portfolio piece — static nginx build [access: public]
+  - hostname: "earnings-alpha${ENV_PREFIX}.${DOMAIN}"
+    service: http://${ENV_PREFIX_NAME}caddy:80
+
+  # regime-lens — Market-regime detection portfolio piece — static nginx build [access: public]
+  - hostname: "regime-lens${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
   # portfolio — Static personal site on the bare domain [access: public]

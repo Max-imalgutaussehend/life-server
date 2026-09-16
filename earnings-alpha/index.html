@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Earnings Call Alpha</title>
+<meta name="description" content="Segment-level earnings-call sentiment tested against abnormal returns across 16 real transcripts.">
+<link rel="icon" href="/favicon.png?v=2" type="image/png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper: #f4f5f3;
+    --paper-raised: #ffffff;
+    --ink: #1c2226;
+    --ink-soft: #4a545c;
+    --ink-faint: #7c868d;
+    --line: #d7dbd6;
+    --line-soft: #e7e9e5;
+    --accent: #1b4b6b;
+    --accent-soft: #dde8ee;
+    --accent-strong: #123449;
+    --pos: #1a7a4c;
+    --neg: #a4383a;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14181b; --paper-raised: #1b2124; --ink: #eef0ee;
+      --ink-soft: #b7c0c4; --ink-faint: #7e8a8f; --line: #333c3f;
+      --line-soft: #262e31; --accent: #6fa8c9; --accent-soft: #1f3441;
+      --accent-strong: #9cc5df; --pos: #5cc98c; --neg: #e28486;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 16px; line-height: 1.6;
+  }
+  h1, h2, h3 { font-family: 'Source Serif 4', Georgia, serif; color: var(--ink); text-wrap: balance; font-weight: 600; margin: 0; }
+  a { color: var(--accent); }
+  .shell { display: grid; grid-template-columns: 240px minmax(0, 780px); gap: 0 56px; justify-content: center; max-width: 1180px; margin: 0 auto; padding: 40px 24px 120px; }
+  nav.rail { position: sticky; top: 40px; align-self: start; height: max-content; display: flex; flex-direction: column; gap: 18px; }
+  .rail-mark { font-family: 'Source Serif 4', serif; font-size: 1.05rem; font-weight: 600; line-height: 1.3; }
+  .rail-mark small { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; color: var(--ink-faint); font-weight: 400; margin-top: 4px; }
+  .rail-links { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+  .rail-links a { color: var(--ink-soft); text-decoration: none; font-size: 0.86rem; padding: 6px 10px; border-radius: 6px; }
+  .rail-links a:hover { color: var(--ink); background: var(--line-soft); }
+  .rail-verdict { margin-top: 6px; padding: 14px; border-radius: 10px; background: var(--paper-raised); border: 1px solid var(--line); }
+  .rail-verdict .lbl { font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+  .rail-verdict .val { font-family: 'Source Serif 4', serif; font-size: 1.05rem; font-weight: 600; margin-top: 4px; color: var(--neg); }
+  .rail-verdict .sub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 6px; }
+  main { min-width: 0; }
+  header.masthead { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 40px; }
+  .kicker { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  h1.title { font-size: 2.1rem; line-height: 1.15; margin-bottom: 12px; }
+  .dek { color: var(--ink-soft); font-size: 1.05rem; max-width: 62ch; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .chip { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-soft); background: var(--paper-raised); }
+  section { margin-bottom: 52px; scroll-margin-top: 24px; }
+  section .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  section h2 { font-size: 1.5rem; margin-bottom: 16px; }
+  section p { max-width: 68ch; color: var(--ink-soft); }
+  section p + p { margin-top: 12px; }
+  section p strong { color: var(--ink); }
+  .callout { background: var(--paper-raised); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; padding: 18px 20px; margin: 18px 0; }
+  .callout p { color: var(--ink); max-width: none; }
+  .callout .h { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 20px 0; }
+  .tile { background: var(--paper-raised); padding: 16px 18px; }
+  .tile .k { font-size: 0.72rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; font-family: 'IBM Plex Mono', monospace; }
+  .tile .v { font-family: 'IBM Plex Mono', monospace; font-size: 1.5rem; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .tile .v.neg { color: var(--neg); }
+  .tile .v.pos { color: var(--pos); }
+  .tile .d { font-size: 0.76rem; color: var(--ink-soft); margin-top: 4px; }
+  .chart-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px 16px; margin: 20px 0; overflow-x: auto; }
+  .chart-card .chart-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 2px; }
+  .chart-card .chart-sub { font-size: 0.78rem; color: var(--ink-faint); margin-bottom: 14px; }
+  .chart-card svg { display: block; width: 100%; height: auto; min-width: 320px; }
+  svg text { fill: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; font-size: 0.75rem; color: var(--ink-soft); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; background: var(--paper-raised); }
+  thead th { text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--line-soft); font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody td.name { font-family: 'IBM Plex Sans', sans-serif; font-variant-numeric: normal; white-space: normal; }
+  tbody tr:last-child td { border-bottom: none; }
+  .sector-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-strong); }
+  details.call-detail { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; background: var(--paper-raised); overflow: hidden; }
+  details.call-detail summary { cursor: pointer; padding: 12px 16px; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  details.call-detail summary::-webkit-details-marker { display: none; }
+  .sum-left { display: flex; align-items: center; gap: 12px; }
+  .sum-ticker { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 0.9rem; min-width: 46px; }
+  .sum-date { font-size: 0.8rem; color: var(--ink-faint); font-family: 'IBM Plex Mono', monospace; }
+  .call-detail img { display: block; width: 100%; border-top: 1px solid var(--line); background: #fff; }
+  .sum-dispersion { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--ink-soft); }
+  .lim-list { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+  .lim-item { display: flex; gap: 14px; }
+  .lim-num { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--ink-faint); padding-top: 2px; min-width: 20px; }
+  .lim-body p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+  .lim-body strong { color: var(--ink); }
+  footer.colophon { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--ink-faint); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: 1fr; padding: 0 0 80px; }
+    nav.rail { position: sticky; top: 0; z-index: 10; flex-direction: column; gap: 0; background: var(--paper); border-bottom: 1px solid var(--line); padding: 14px 20px 0; width: 100%; overflow: hidden; }
+    .rail-mark { white-space: nowrap; font-size: 0.95rem; margin-bottom: 10px; }
+    .rail-mark small { display: none; }
+    .rail-links {
+      flex-direction: row; flex-wrap: nowrap; margin-top: 0; gap: 4px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      width: 100%; min-width: 0;
+      /* fade the right edge so a scrollable nav never looks like clipped text */
+      mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+      padding-bottom: 12px;
+    }
+    .rail-links a { padding: 6px 10px; white-space: nowrap; flex-shrink: 0; border-radius: 999px; background: var(--paper-raised); border: 1px solid var(--line); }
+    .rail-verdict { display: none; }
+    main { padding: 24px 20px 0; }
+    h1.title { font-size: 1.6rem; }
+    .dek { font-size: 0.95rem; }
+    .meta-row .chip { font-size: 0.68rem; }
+  }
+
+  @media (max-width: 520px) {
+    nav.rail { padding: 12px 14px 0; }
+    main { padding: 20px 14px 0; }
+    .shell { padding-bottom: 64px; }
+    h1.title { font-size: 1.35rem; }
+    section h2 { font-size: 1.2rem; }
+    .chart-card { padding: 14px 12px 12px; }
+    .tile { padding: 12px 14px; }
+    .tile .v { font-size: 1.25rem; }
+    details.call-detail summary { flex-direction: column; align-items: flex-start; gap: 6px; }
+    footer.colophon { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail">
+    <div class="rail-mark">Earnings Call Alpha<small>SEGMENT-SENTIMENT RESEARCH NOTE</small></div>
+    <div class="rail-links">
+      <a href="#hypothesis">Hypothesis</a>
+      <a href="#method">Method</a>
+      <a href="#sample">Sample</a>
+      <a href="#regression">Regression test</a>
+      <a href="#backtest">Backtest</a>
+      <a href="#calls">Per-call detail</a>
+      <a href="#limits">Limitations</a>
+    </div>
+    <div class="rail-verdict">
+      <div class="lbl">Current verdict, n&#8201;=&#8201;16</div>
+      
+      <div class="val">H1 not supported</div>
+      <div class="sub">Dispersion's p-value is 0.748 (1d) / 0.776 (3d) &mdash; not distinguishable from zero.</div>
+      
+    </div>
+  </nav>
+
+  <main>
+    <header class="masthead">
+      <div class="kicker">Reproduction &amp; extension &middot; arXiv:2505.16090, arXiv:2410.01772</div>
+      <h1 class="title">Does segment-level sentiment beat whole-transcript sentiment?</h1>
+      <p class="dek">A falsifiable test on 16 real, first-party earnings-call transcripts: whether the dispersion of FinBERT sentiment across a call's Q&amp;A segments predicts abnormal returns beyond what the whole-transcript average already explains.</p>
+      <div class="meta-row">
+        <span class="chip">n = 16 calls</span>
+        <span class="chip">5 tickers &middot; 4 sectors</span>
+        <span class="chip">BAC, CAT, JPM, MSFT, XOM</span>
+        <span class="chip">FinBERT &middot; Fama-French &middot; PSR</span>
+      </div>
+    </header>
+
+    <section id="hypothesis">
+      <div class="eyebrow">01 &middot; Hypothesis</div>
+      <h2>A falsifiable claim, stated before looking at results</h2>
+      <p><strong>H1:</strong> the dispersion of sentiment across a call's segments (max&nbsp;&minus;&nbsp;min segment sentiment) has incremental predictive power for the 1-day and 3-day abnormal return around the call, beyond what whole-transcript sentiment alone explains.</p>
+      <div class="callout">
+        <div class="h">Why this, not another metric</div>
+        <p>Most quant portfolios show price-only signals; most IB-style analyses show no statistical validation. This sits between the two &mdash; a qualitative artifact (an earnings call) tested with a quant-style falsifiable claim, explicit backtest, and transaction costs. A null result here is treated as a complete, reportable finding, not a failed run.</p>
+      </div>
+    </section>
+
+    <section id="method">
+      <div class="eyebrow">02 &middot; Method</div>
+      <h2>Six steps, each independently auditable</h2>
+      <p>1&#8201;&middot;&#8201;<strong>Segment</strong> each call into prepared-remarks blocks and analyst Q&amp;A exchanges (rule-based, not learned). 2&#8201;&middot;&#8201;<strong>Score</strong> each segment with FinBERT. 3&#8201;&middot;&#8201;<strong>Compute</strong> whole-transcript sentiment, segment dispersion, and core-segment sentiment. 4&#8201;&middot;&#8201;<strong>Measure</strong> Fama-French market-model abnormal returns for [0,+1] and [0,+3] trading days. 5&#8201;&middot;&#8201;<strong>Test</strong> with a nested regression isolating dispersion's incremental R&sup2;. 6&#8201;&middot;&#8201;<strong>Backtest</strong> a walk-forward long/short sort, scored with the Probabilistic Sharpe Ratio.</p>
+    </section>
+
+    <section id="sample">
+      <div class="eyebrow">03 &middot; Sample</div>
+      <h2>16 calls, sourced first-party only</h2>
+      <p>Every transcript is either an SEC 8-K exhibit or a PDF/HTML transcript published directly by the company's own investor-relations site &mdash; never a third-party aggregator.</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Ticker</th><th>Sector</th><th>Calls</th><th># in sample</th></tr></thead>
+          <tbody>
+          
+            <tr><td class="name">BAC</td><td><span class="sector-badge">Financials</span></td><td>2026-04-15, 2026-07-14</td><td>2</td></tr>
+          
+            <tr><td class="name">CAT</td><td><span class="sector-badge">Industrials</span></td><td>2025-08-05, 2025-10-29, 2026-01-29, 2026-04-30</td><td>4</td></tr>
+          
+            <tr><td class="name">JPM</td><td><span class="sector-badge">Financials</span></td><td>2025-07-15, 2025-10-14, 2026-01-13, 2026-04-14, 2026-07-14</td><td>5</td></tr>
+          
+            <tr><td class="name">MSFT</td><td><span class="sector-badge">Technology</span></td><td>2026-07-29</td><td>1</td></tr>
+          
+            <tr><td class="name">XOM</td><td><span class="sector-badge">Energy</span></td><td>2024-08-02, 2025-01-31, 2026-01-30, 2026-05-01</td><td>4</td></tr>
+          
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="regression">
+      <div class="eyebrow">04 &middot; Regression test</div>
+      
+      <h2>H1 is not supported at this sample size</h2>
+      <p>A nested OLS regression compares whole-transcript sentiment alone against whole-transcript sentiment&nbsp;+&nbsp;dispersion. The number that matters is the <em>incremental</em> R&sup2; dispersion adds, and whether its coefficient clears significance.</p>
+      <div class="tiles">
+        <div class="tile"><div class="k">1d p-value</div><div class="v">0.748</div><div class="d">n=16</div></div>
+        <div class="tile"><div class="k">3d p-value</div><div class="v">0.776</div><div class="d">n=16</div></div>
+        <div class="tile"><div class="k">Incremental R&sup2; (1d)</div><div class="v">0.8%</div><div class="d">over whole-transcript alone</div></div>
+        <div class="tile"><div class="k">Incremental R&sup2; (3d)</div><div class="v">0.6%</div><div class="d">over whole-transcript alone</div></div>
+      </div>
+      <div class="callout">
+        <div class="h">Reading this honestly</div>
+        <p>Neither p-value is close to conventional significance thresholds, even before any multiple-testing correction. This is reported as the finding, not smoothed over &mdash; see the project README for how this number changed as the sample grew.</p>
+      </div>
+      
+    </section>
+
+    <section id="backtest">
+      <div class="eyebrow">05 &middot; Illustrative backtest</div>
+      
+      <h2>Walk-forward long/short, scored honestly</h2>
+      <p>A signal-sorted long/short backtest with 10bps/side transaction costs and a walk-forward split. Scored with the Probabilistic Sharpe Ratio (Bailey &amp; Lopez de Prado, 2012) rather than a raw Sharpe ratio.</p>
+      <div class="tiles">
+        <div class="tile"><div class="k">Trades</div><div class="v">6</div><div class="d">out-of-sample</div></div>
+        <div class="tile"><div class="k">Cumulative return</div><div class="v neg">-20.2%</div><div class="d">net of costs</div></div>
+        <div class="tile"><div class="k">Raw Sharpe</div><div class="v neg">-0.52</div><div class="d">per-trade</div></div>
+        <div class="tile"><div class="k">Probabilistic Sharpe</div><div class="v neg">6.3%</div><div class="d">P(true Sharpe &gt; 0)</div></div>
+      </div>
+      
+      <div class="chart-card">
+        <div class="chart-title">Cumulative net return, walk-forward order</div>
+        <div class="chart-sub">6 out-of-sample trades, sorted by call date</div>
+        
+        
+        
+        
+        <svg viewBox="0 0 640 200" role="img" aria-label="Line chart of cumulative net backtest return across 6 trades">
+          <line x1="50" y1="20" x2="50" y2="160" stroke="var(--line)" stroke-width="1"/>
+          <line x1="50" y1="160" x2="610" y2="160" stroke="var(--line)" stroke-width="1"/>
+          <text x="42" y="24" text-anchor="end" font-size="10">1%</text>
+          <text x="42" y="164" text-anchor="end" font-size="10">-20%</text>
+          <polyline points="80.0,30.0 180.0,74.5 280.0,70.2 380.0,53.0 480.0,73.0 580.0,160.0" fill="none" stroke="var(--neg)" stroke-width="2.5"/>
+          
+          <circle cx="80.0" cy="30.0" r="3.5" fill="var(--neg)"/>
+          
+          <circle cx="180.0" cy="74.5" r="3.5" fill="var(--neg)"/>
+          
+          <circle cx="280.0" cy="70.2" r="3.5" fill="var(--neg)"/>
+          
+          <circle cx="380.0" cy="53.0" r="3.5" fill="var(--neg)"/>
+          
+          <circle cx="480.0" cy="73.0" r="3.5" fill="var(--neg)"/>
+          
+          <circle cx="580.0" cy="160.0" r="3.5" fill="var(--neg)"/>
+          
+        </svg>
+      </div>
+      
+      
+    </section>
+
+    <section id="calls">
+      <div class="eyebrow">06 &middot; Per-call detail</div>
+      <h2>Every call, whole-transcript vs. core-segment sentiment</h2>
+      <p>Click a row to see that call's full segment-sentiment heatmap.</p>
+
+      <div class="chart-card">
+        <div class="chart-title">Whole-transcript vs. core-segment sentiment, all 16 calls</div>
+        <div class="chart-sub">FinBERT score range &minus;1 to +1</div>
+        <svg viewBox="0 0 660 456" role="img" aria-label="Diverging bar chart comparing whole-transcript sentiment to core-segment sentiment for each call">
+          <line x1="330" y1="10" x2="330" y2="446" stroke="var(--line)" stroke-width="1"/>
+          
+          
+          <text x="8" y="29" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">BAC 2026-04-15</text>
+          <rect x="330" y="14" width="136.62" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="25" width="39.95" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="56" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">BAC 2026-07-14</text>
+          <rect x="330" y="41" width="140.71" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="52" width="74.02" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="83" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">CAT 2025-08-05</text>
+          <rect x="330" y="68" width="6.75" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="325.14" y="79" width="4.86" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="110" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">CAT 2025-10-29</text>
+          <rect x="330" y="95" width="9.47" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="106" width="81.2" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="137" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">CAT 2026-01-29</text>
+          <rect x="330" y="122" width="0.89" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="133" width="66.03" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="164" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">CAT 2026-04-30</text>
+          <rect x="330" y="149" width="1.53" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="160" width="65.2" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="191" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">JPM 2025-07-15</text>
+          <rect x="330" y="176" width="9.16" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="311.77" y="187" width="18.23" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="218" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">JPM 2025-10-14</text>
+          <rect x="315.33" y="203" width="14.67" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="322.63" y="214" width="7.37" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="245" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">JPM 2026-01-13</text>
+          <rect x="330" y="230" width="11.63" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="241" width="10.49" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="272" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">JPM 2026-04-14</text>
+          <rect x="330" y="257" width="11.36" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="268" width="7.81" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="299" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">JPM 2026-07-14</text>
+          <rect x="330" y="284" width="22.28" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="295" width="11.26" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="326" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">MSFT 2026-07-29</text>
+          <rect x="330" y="311" width="1.32" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="322" width="37.32" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="353" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">XOM 2024-08-02</text>
+          <rect x="330" y="338" width="136.64" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="349" width="46.26" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="380" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">XOM 2025-01-31</text>
+          <rect x="330" y="365" width="107.36" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="376" width="49.19" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="407" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">XOM 2026-01-30</text>
+          <rect x="330" y="392" width="26.09" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="403" width="41.56" height="9" fill="var(--accent)"/>
+          
+          
+          
+          <text x="8" y="434" font-size="10.5" font-family="'IBM Plex Sans', sans-serif">XOM 2026-05-01</text>
+          <rect x="330" y="419" width="96.44" height="9" fill="var(--ink-faint)"/>
+          
+          <rect x="330" y="430" width="67.72" height="9" fill="var(--accent)"/>
+          
+          
+        </svg>
+        <div class="legend"><span><span class="swatch" style="background:var(--ink-faint)"></span>Whole-transcript</span><span><span class="swatch" style="background:var(--accent)"></span>Core-segment</span></div>
+      </div>
+
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">BAC</span><span class="sum-date">2026-04-15</span></span>
+          <span class="sum-dispersion">dispersion 1.02 &middot; core&minus;whole -0.64</span>
+        </summary>
+        <img src="figures/BAC_2026-04-15_segment_heatmap.png" alt="Segment sentiment heatmap for BAC 2026-04-15" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">BAC</span><span class="sum-date">2026-07-14</span></span>
+          <span class="sum-dispersion">dispersion 1.47 &middot; core&minus;whole -0.44</span>
+        </summary>
+        <img src="figures/BAC_2026-07-14_segment_heatmap.png" alt="Segment sentiment heatmap for BAC 2026-07-14" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">CAT</span><span class="sum-date">2025-08-05</span></span>
+          <span class="sum-dispersion">dispersion 1.74 &middot; core&minus;whole -0.08</span>
+        </summary>
+        <img src="figures/CAT_2025-08-05_segment_heatmap.png" alt="Segment sentiment heatmap for CAT 2025-08-05" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">CAT</span><span class="sum-date">2025-10-29</span></span>
+          <span class="sum-dispersion">dispersion 1.87 &middot; core&minus;whole +0.48</span>
+        </summary>
+        <img src="figures/CAT_2025-10-29_segment_heatmap.png" alt="Segment sentiment heatmap for CAT 2025-10-29" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">CAT</span><span class="sum-date">2026-01-29</span></span>
+          <span class="sum-dispersion">dispersion 1.81 &middot; core&minus;whole +0.43</span>
+        </summary>
+        <img src="figures/CAT_2026-01-29_segment_heatmap.png" alt="Segment sentiment heatmap for CAT 2026-01-29" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">CAT</span><span class="sum-date">2026-04-30</span></span>
+          <span class="sum-dispersion">dispersion 0.93 &middot; core&minus;whole +0.42</span>
+        </summary>
+        <img src="figures/CAT_2026-04-30_segment_heatmap.png" alt="Segment sentiment heatmap for CAT 2026-04-30" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">JPM</span><span class="sum-date">2025-07-15</span></span>
+          <span class="sum-dispersion">dispersion 1.20 &middot; core&minus;whole -0.18</span>
+        </summary>
+        <img src="figures/JPM_2025-07-15_segment_heatmap.png" alt="Segment sentiment heatmap for JPM 2025-07-15" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">JPM</span><span class="sum-date">2025-10-14</span></span>
+          <span class="sum-dispersion">dispersion 0.71 &middot; core&minus;whole +0.05</span>
+        </summary>
+        <img src="figures/JPM_2025-10-14_segment_heatmap.png" alt="Segment sentiment heatmap for JPM 2025-10-14" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">JPM</span><span class="sum-date">2026-01-13</span></span>
+          <span class="sum-dispersion">dispersion 1.00 &middot; core&minus;whole -0.01</span>
+        </summary>
+        <img src="figures/JPM_2026-01-13_segment_heatmap.png" alt="Segment sentiment heatmap for JPM 2026-01-13" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">JPM</span><span class="sum-date">2026-04-14</span></span>
+          <span class="sum-dispersion">dispersion 1.11 &middot; core&minus;whole -0.02</span>
+        </summary>
+        <img src="figures/JPM_2026-04-14_segment_heatmap.png" alt="Segment sentiment heatmap for JPM 2026-04-14" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">JPM</span><span class="sum-date">2026-07-14</span></span>
+          <span class="sum-dispersion">dispersion 0.36 &middot; core&minus;whole -0.07</span>
+        </summary>
+        <img src="figures/JPM_2026-07-14_segment_heatmap.png" alt="Segment sentiment heatmap for JPM 2026-07-14" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">MSFT</span><span class="sum-date">2026-07-29</span></span>
+          <span class="sum-dispersion">dispersion 0.71 &middot; core&minus;whole +0.24</span>
+        </summary>
+        <img src="figures/MSFT_2026-07-29_segment_heatmap.png" alt="Segment sentiment heatmap for MSFT 2026-07-29" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">XOM</span><span class="sum-date">2024-08-02</span></span>
+          <span class="sum-dispersion">dispersion 0.89 &middot; core&minus;whole -0.60</span>
+        </summary>
+        <img src="figures/XOM_2024-08-02_segment_heatmap.png" alt="Segment sentiment heatmap for XOM 2024-08-02" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">XOM</span><span class="sum-date">2025-01-31</span></span>
+          <span class="sum-dispersion">dispersion 0.92 &middot; core&minus;whole -0.39</span>
+        </summary>
+        <img src="figures/XOM_2025-01-31_segment_heatmap.png" alt="Segment sentiment heatmap for XOM 2025-01-31" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">XOM</span><span class="sum-date">2026-01-30</span></span>
+          <span class="sum-dispersion">dispersion 1.02 &middot; core&minus;whole +0.10</span>
+        </summary>
+        <img src="figures/XOM_2026-01-30_segment_heatmap.png" alt="Segment sentiment heatmap for XOM 2026-01-30" loading="lazy">
+      </details>
+      
+      <details class="call-detail">
+        <summary>
+          <span class="sum-left"><span class="sum-ticker">XOM</span><span class="sum-date">2026-05-01</span></span>
+          <span class="sum-dispersion">dispersion 0.95 &middot; core&minus;whole -0.19</span>
+        </summary>
+        <img src="figures/XOM_2026-05-01_segment_heatmap.png" alt="Segment sentiment heatmap for XOM 2026-05-01" loading="lazy">
+      </details>
+      
+    </section>
+
+    <section id="limits">
+      <div class="eyebrow">07 &middot; Limitations, stated up front</div>
+      <h2>What this is not</h2>
+      <div class="lim-list">
+        <div class="lim-item"><div class="lim-num">01</div><div class="lim-body"><p><strong>Small, non-random sample.</strong> 16 calls across 5 tickers, curated for transcript availability &mdash; not a random draw from the market.</p></div></div>
+        <div class="lim-item"><div class="lim-num">02</div><div class="lim-body"><p><strong>No multiple-testing correction</strong> across the two return windows tested (1-day, 3-day).</p></div></div>
+        <div class="lim-item"><div class="lim-num">03</div><div class="lim-body"><p><strong>Core-segment keywords use present-day knowledge</strong> of each firm's largest business line, which may not match an older quarter.</p></div></div>
+        <div class="lim-item"><div class="lim-num">04</div><div class="lim-body"><p><strong>Daily closes, not intraday.</strong> Event-window returns are coarser than sub-minute market-microstructure studies.</p></div></div>
+        <div class="lim-item"><div class="lim-num">05</div><div class="lim-body"><p><strong>Research prototype</strong>, not a claim of a deployable trading signal.</p></div></div>
+      </div>
+    </section>
+
+    <footer class="colophon">
+      <span>Reproduces Kim et al. 2025 (arXiv:2505.16090) &amp; DeFine (arXiv:2410.01772)</span>
+      <span>src/site/render.py &middot; n=16</span>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

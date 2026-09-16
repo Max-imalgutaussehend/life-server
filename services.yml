@@ -94,22 +94,6 @@ services:
   #
   # It is a plain compose service on `agent` only. See ADR-0020.
 
-  # ── dashboard — the whole system on one page (M17) ────────────────────────
-  # Reads Uptime Kuma's database and Paperclip's, plus /proc. It writes
-  # nothing anywhere, which is what makes `networks: [apps, data]` acceptable
-  # for a service that is reachable from outside: being on `data` lets it
-  # SELECT, and there is no code path in it that does anything else.
-  #
-  # `access: private` — this shows the state of every service, the agent
-  # roster and the ticket board. Cloudflare Access is what keeps it the
-  # operator's own view.
-  - name: dashboard
-    port: 8090
-    description: "System, services, agents and KPIs on one page (M17)"
-    networks: [apps, data]
-    access: private
-    enabled: true # M17
-
   # ── openclaw — the exception to the paragraph above (M14, ADR-0022) ───────
   # OpenClaw's gateway serves its own web chat ("OpenClaw Control") on 18789.
   # The operator asked for a browser client because WhatsApp is too limited,
@@ -135,29 +119,37 @@ services:
     access: private
     enabled: true # M14
 
-  # ── options — the agent-built quant project (M18) ─────────────────────────
-  # A portfolio piece: the model-disagreement option arbitrage study. Built
-  # and deployed by the agent flotilla, which is itself part of the point.
-  #
-  # `access: public` — the operator asked for no Access gate, because a
-  # portfolio project nobody can open is not a portfolio project.
-  #
-  # WHAT MAKES THAT ACCEPTABLE, and what the agent must therefore respect:
-  #   - It serves a STATIC build: pre-computed results, charts, write-up.
-  #     No endpoint that runs a backtest on demand, because that is compute
-  #     any stranger could spend.
-  #   - `networks: [apps]` only. No Postgres, no Redis, nothing to steal.
-  #   - No credential inside it. Market data is fetched at BUILD time, and
-  #     whatever key that needs stays in .env, never in the image.
-  #
-  # If it ever needs to be dynamic, that is a new decision and a new ADR —
-  # not a quiet change to this entry.
-  - name: options
-    port: 8081
-    description: "Model-disagreement option arbitrage study (M18, agent-built)"
+  # ── earnings-alpha — portfolio piece, static nginx build ──────────────────
+  # Same shape as the (removed) `options` entry: a static build, no backend, no
+  # database. `networks: [apps]` only — nothing to steal if it is breached.
+  # Image built and pushed by its own repo's CI to GHCR; pinned by digest
+  # (ADR-0011's M7 exception, same as longevity).
+  # Port 8083, not 80: the image's internal nginx listens on 80, but the
+  # generator rejects two enabled services declaring the same port number
+  # here (see portfolio's note on ntfy) — the number is container-internal
+  # either way, nothing is published to the host (ADR-0003), so this is
+  # purely this file's own bookkeeping, not the image's actual listen port.
+  - name: earnings-alpha
+    port: 8083
+    description: "Earnings-call sentiment portfolio piece — static nginx build"
     networks: [apps]
     access: public
-    enabled: true # M18
+    enabled: true
+
+  # ── regime-lens — portfolio piece, static nginx build ──────────────────────
+  # Same shape as earnings-alpha: static build, no backend, no database, no
+  # credential inside it. Image built and pushed to GHCR from its own repo
+  # (github.com/Max-imalgutaussehend/regime-lens); pinned by digest (ADR-0011's
+  # M7 exception, same as longevity and earnings-alpha).
+  # Port 8084, not 80: same reason as earnings-alpha — the image's internal
+  # nginx listens on 80, but the generator rejects two enabled services
+  # sharing a port number here.
+  - name: regime-lens
+    port: 8084
+    description: "Market-regime detection portfolio piece — static nginx build"
+    networks: [apps]
+    access: public
+    enabled: true
 
   # ── THE ONLY PUBLIC SERVICE ON THIS HOST ──────────────────────────────────
   # A static portfolio on the bare domain. `access: public` is deliberate and

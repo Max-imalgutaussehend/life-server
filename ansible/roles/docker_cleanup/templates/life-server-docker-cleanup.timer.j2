@@ -1,0 +1,22 @@
+# Managed by Ansible (roles/docker_cleanup). Local edits are overwritten.
+
+[Unit]
+Description=Prune unreferenced Docker images daily
+Documentation=file:///opt/life-server/docs/adr/0011-pinned-image-versions.md
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+
+# A host that was down at 03:15 should still get pruned on the next boot —
+# otherwise a long-downed host resumes with every stale image still queued
+# up, silently, until the disk fills again.
+Persistent=true
+
+# Offset from life-server-backup (02:30) and its own RandomizedDelaySec so the
+# two don't compete for disk I/O on a host this small.
+RandomizedDelaySec=300
+
+Unit=life-server-docker-cleanup.service
+
+[Install]
+WantedBy=timers.target
