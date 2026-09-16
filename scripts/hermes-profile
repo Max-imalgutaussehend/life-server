@@ -55,7 +55,7 @@ PRO_PORT=20128
 PRO_URL="http://localhost:${PRO_PORT}/v1"
 PRO_MODEL="cliproxy/claude-sonnet-5"
 
-SERVER="${SERVER:-deploy@62.238.4.64}"
+SERVER="${SERVER:?set SERVER=deploy@<host-ip>}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/life-server}"
 REPO="${REPO:-$HOME/Documents/coding-projects/life-server}"
 TUNNEL_CTL="$HOME/.ssh/hermes-tunnel.sock"

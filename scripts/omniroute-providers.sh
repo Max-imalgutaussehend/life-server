@@ -32,7 +32,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/life-server}"
-SERVER="${SERVER:-deploy@62.238.4.64}"
+SERVER="${SERVER:?set SERVER=deploy@<host-ip>}"
 PREFIX="${ENV_PREFIX_NAME:-prod-}"
 
 # Reuse deploy.sh's multiplexed connection if it is open; ufw rate-limits port

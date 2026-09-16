@@ -28,7 +28,7 @@ export
 
 REPO_ROOT := $(shell pwd)
 SSH_KEY   ?= ~/.ssh/life-server
-SERVER_IP ?= 62.238.4.64
+SERVER_IP ?= $(error SERVER_IP not set - export it or put it in a local .env)
 ANSIBLE   := ansible-playbook -i ansible/inventory.ini
 
 # The age key is passed EXPLICITLY rather than relying on sops finding it.
