@@ -5,16 +5,16 @@ Each phase needs: ADR, test, rollback. Status: `todo` unless noted.
 
 | # | Phase | Needs credentials |
 |---|---|---|
-| 01 | R1 audit + freeze (tag `release-1` pushed; CI green; restore rehearsal) | no |
+| 01 | R1 audit + freeze (tag pushed; generator check verified locally; CI status and restore rehearsal open) | no |
 | 02 | Aevia rebrand (docs/text first; GitHub repo rename last) | no |
 | 03 | Service inventory → `catalog/services.yml` (drafted) | no |
 | 04 | Remove agent stack (Paperclip, Hermes, OpenClaw, CLIProxy) | no |
 | 05 | R2 repo design + OpenTofu modules | no |
-| 06 | Provision parallel R2 VPS | Hetzner, tofu state |
-| 07 | k3s bootstrap | server SSH |
-| 08 | Cilium (default-deny per namespace) | — |
-| 09 | Argo CD | — |
-| 10 | Secrets (SOPS + age) | age key |
+| 06 | Provision parallel R2 VPS (ADR-0029, drafted) | Hetzner, tofu state |
+| 07 | k3s bootstrap (ADR-0030, drafted) | server SSH |
+| 08 | Cilium (ADR-0030) (default-deny per namespace) | — |
+| 09 | Argo CD (ADR-0031, drafted) | — |
+| 10 | Secrets (SOPS + age) (ADR-0032, drafted) | age key |
 | 11 | Ingress / Cloudflare | Cloudflare |
 | 12 | PostgreSQL (logical restore from R1, verified) | — |
 | 13 | Redis | — |
