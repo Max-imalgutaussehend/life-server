@@ -1,6 +1,6 @@
 # ADR-0021: A fallback model router, and the part of ADR-0018 it reverses
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch (agent stack removed; still true at `release-1`)
 - **Date:** 2026-08-24
 - **Milestone:** M13
 - **Supersedes in part:** ADR-0018 ("why it does not need a second LLM")

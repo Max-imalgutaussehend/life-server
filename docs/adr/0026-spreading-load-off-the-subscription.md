@@ -1,6 +1,6 @@
 # ADR-0026: Spreading agent load off the Pro subscription
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch (agent stack removed; still true at `release-1`)
 - **Date:** 2026-08-30
 - **Milestone:** M17
 - **Builds on:** ADR-0021 (the router), ADR-0018 (why free providers were refused)

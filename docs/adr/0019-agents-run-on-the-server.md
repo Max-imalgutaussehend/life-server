@@ -1,6 +1,6 @@
 # ADR-0019: Agents run on the server, using a long-lived subscription token
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch (agent stack removed; still true at `release-1`)
 - **Date:** 2026-07-31
 - **Milestone:** M10
 - **Supersedes:** [ADR-0017](0017-agents-run-on-the-operator-machine.md)

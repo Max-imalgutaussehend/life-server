@@ -1,6 +1,6 @@
 # ADR-0023: OpenClaw gets the Docker socket
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch (agent stack removed; still true at `release-1`)
 - **Date:** 2026-08-26
 - **Milestone:** M15
 - **Overrides for one container:** ADR-0004 (segmented networks), M9 (agent sandbox)

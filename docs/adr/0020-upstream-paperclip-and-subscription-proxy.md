@@ -1,6 +1,6 @@
 # ADR-0020: Upstream Paperclip, two agent runtimes, one subscription proxy
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch (agent stack removed; still true at `release-1`)
 - **Date:** 2026-08-01
 - **Supersedes:** ADR-0019 (in full), ADR-0018 (WhatsApp transport)
 

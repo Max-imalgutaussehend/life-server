@@ -1,6 +1,6 @@
 # ADR-0027: No subscription consumption on an idle system
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch (agent stack removed; still true at `release-1`)
 - **Date:** 2026-08-30
 - **Milestone:** M18
 - **Amends:** ADR-0020 (the credential heartbeat), ADR-0026 (tier 2)

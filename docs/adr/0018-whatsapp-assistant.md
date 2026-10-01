@@ -1,6 +1,6 @@
 # ADR-0018: A WhatsApp assistant, and why it does not need a second LLM
 
-- **Status:** Proposed — needs one decision from the operator (see the end)
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch (agent stack removed; still true at `release-1`)
 - **Date:** 2026-07-31
 - **Milestone:** M10
 
