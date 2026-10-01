@@ -1,0 +1,24 @@
+name: tofu
+
+on:
+  push:
+    paths: ["infra/tofu/**", "catalog/**", ".github/workflows/tofu.yml"]
+  pull_request:
+    paths: ["infra/tofu/**", "catalog/**", ".github/workflows/tofu.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.13.0
+      - run: tofu fmt -check -recursive infra/tofu
+      - run: tofu init -backend=false
+        working-directory: infra/tofu/environments/production
+      - run: tofu validate
+        working-directory: infra/tofu/environments/production
