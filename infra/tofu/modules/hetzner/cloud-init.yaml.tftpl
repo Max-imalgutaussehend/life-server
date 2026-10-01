@@ -1,0 +1,15 @@
+#cloud-config
+# Minimal first-boot. Everything Kubernetes-related is done by cluster/bootstrap,
+# not here, so a node can be rebuilt without touching tofu state semantics.
+hostname: ${hostname}
+package_update: true
+package_upgrade: true
+packages: [curl, ca-certificates, unattended-upgrades, fail2ban]
+ssh_pwauth: false
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-aevia.conf
+    content: |
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+runcmd:
+  - systemctl restart ssh

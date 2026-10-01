@@ -1,0 +1,4 @@
+bucket   = "aevia-tofu-state"
+endpoint = "https://nbg1.your-objectstorage.com"
+access_key = "__SET__"
+secret_key = "__SET__"

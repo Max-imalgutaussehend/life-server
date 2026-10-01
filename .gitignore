@@ -36,3 +36,10 @@ venv/
 *.swp
 .idea/
 .venv-gen/
+
+# OpenTofu
+**/.terraform/
+*.tfstate*
+backend.hcl
+*.tfvars
+!*.tfvars.example
