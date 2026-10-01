@@ -1,0 +1,74 @@
+# Fixture for tests/isolation/run.sh: namespace `data` is default-deny and only
+# `apps` may reach it. `agents` has no allow-rule, so it must be refused.
+apiVersion: v1
+kind: Namespace
+metadata: { name: data, labels: { aevia/zone: data } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: apps, labels: { aevia/zone: apps } }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: agents, labels: { aevia/zone: agents } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny, namespace: data }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-from-apps, namespace: data }
+spec:
+  podSelector: { matchLabels: { app: postgres } }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { aevia/zone: apps } }
+      ports: [{ port: 80 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny, namespace: agents }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-egress-apps-and-dns, namespace: apps }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { aevia/zone: data } } }]
+    - to: [{ namespaceSelector: {} }]
+      ports: [{ port: 53, protocol: UDP }]
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: postgres, namespace: data, labels: { app: postgres } }
+spec:
+  containers: [{ name: web, image: nginx:1.27-alpine }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres, namespace: data }
+spec:
+  selector: { app: postgres }
+  ports: [{ port: 80 }]
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: client, namespace: apps }
+spec:
+  containers: [{ name: c, image: curlimages/curl:8.10.1, command: [sleep, "3600"] }]
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: client, namespace: agents }
+spec:
+  containers: [{ name: c, image: curlimages/curl:8.10.1, command: [sleep, "3600"] }]

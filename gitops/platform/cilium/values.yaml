@@ -1,0 +1,10 @@
+# Cilium as CNI and kube-proxy replacement (ADR-0030).
+kubeProxyReplacement: true
+ipam:
+  mode: kubernetes
+operator:
+  replicas: 1
+hubble:
+  enabled: true
+  relay:
+    enabled: true

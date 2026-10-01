@@ -12,7 +12,7 @@ Each phase needs: ADR, test, rollback. Status: `todo` unless noted.
 | 05 | R2 repo design + OpenTofu modules | no |
 | 06 | Provision parallel R2 VPS (ADR-0029, drafted) | Hetzner, tofu state |
 | 07 | k3s bootstrap (ADR-0030, drafted) | server SSH |
-| 08 | Cilium (ADR-0030) (default-deny per namespace) | — |
+| 08 | Cilium (ADR-0030; isolation test `tests/isolation/run.sh` passes on kind) (default-deny per namespace) | — |
 | 09 | Argo CD (ADR-0031, drafted) | — |
 | 10 | Secrets (SOPS + age) (ADR-0032, drafted) | age key |
 | 11 | Ingress / Cloudflare | Cloudflare |
