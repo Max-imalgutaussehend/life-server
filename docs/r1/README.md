@@ -1,9 +1,4 @@
-> **Branch `r2` — Aevia.** This branch is the in-progress rewrite of life-server
-> as a Kubernetes platform (OpenTofu, k3s, Cilium, Argo CD). The agent stack has
-> been removed here. The Docker/Ansible implementation lives on at tag
-> `release-1`. See [ADR-0028](docs/adr/0028-aevia-r2-kubernetes-platform.md) and
-> [the migration plan](docs/migration/R2-PLAN.md). The text below still
-> describes R1 and is rewritten in phase 02.
+> **R1 reference.** README of the Docker/Ansible implementation, frozen at tag `release-1`. Kept on `r2` until cutover (phase 29). For Aevia R2 see the [root README](../../README.md).
 
 # life-server
 
