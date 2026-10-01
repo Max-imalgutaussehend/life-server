@@ -41,7 +41,7 @@ set -a
 . "${COMPOSE_DIR}/.env"
 set +a
 
-SERVICES=(n8n paperclip hermes)
+SERVICES=(n8n)
 
 # --- 1. Each role reaches its OWN database ----------------------------------
 echo "== each role can reach its own database =="

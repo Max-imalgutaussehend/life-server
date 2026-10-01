@@ -55,7 +55,7 @@ TEMPLATES = REPO / "generator" / "templates"
 # had a public route and so nothing on it was ever declared in the registry.
 # openclaw is the first, and the omission surfaced exactly as ADR-0014 intends:
 # a loud generation error rather than a silently missing route.
-VALID_NETWORKS = {"edge", "apps", "data", "agent"}
+VALID_NETWORKS = {"edge", "apps", "data"}
 VALID_ACCESS = {"private", "public"}
 VALID_ENVS = {"prod", "dev"}
 NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")

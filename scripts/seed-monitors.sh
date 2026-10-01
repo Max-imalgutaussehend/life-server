@@ -79,59 +79,7 @@ const monitors = [
   // single-quoted node -e argument, so a stray apostrophe silently ends the
   // string and the rest gets parsed as shell (shellcheck SC1011).
 
-  // M11. Reachable because Paperclip is on `apps` as well as `agent`.
-  { name: "paperclip", url: "http://" + process.env.PREFIX + "paperclip:3100/api/health" },
-
-  // ── THE MOST IMPORTANT MONITOR HERE (M11, ADR-0020) ──────────────────────
-  //
-  // A PUSH monitor, not an HTTP one, and that is the whole point.
-  //
-  // cliproxy lives on `agent`; Kuma lives on `apps`. Kuma could poll it only
-  // by joining `agent` — which would also let every code-executing agent
-  // session reach Kuma, and Kuma holds the ntfy PUBLISH token, i.e. the
-  // ability to send a forged all-clear. M8 established that the all-clear is
-  // the one message that must stay trustworthy. So the connection direction is
-  // inverted instead: the agent side reports OUT, and no network is widened.
-  //
-  // WHAT IT CATCHES: the Claude OAuth credential expires in ~7 days, and when
-  // it does every agent stops SILENTLY — indistinguishable from an empty
-  // queue. That is the M10 failure exactly, and it is the failure this system
-  // is most likely to actually hit.
-  //
-  // Unlike an HTTP check, the heartbeat is sent only after a REAL completion
-  // succeeds (see compose/cliproxy/heartbeat.sh), so it proves the credential
-  // still works — not merely that the process is up.
-  //
-  // 3900s ≈ 65 min against an hourly heartbeat: one missed report is tolerated
-  // (a restart), two is an alert.
-  { name: "cliproxy", type: "push", interval: 3900 },
-
-  // ── M17: the services that were running unwatched ────────────────────────
-  // The dashboard made the gap obvious — six monitors against fifteen
-  // containers, and the ones missing were not the unimportant ones.
-  //
-  // omniroute is the clearest case: every agent turn in the system goes
-  // through it since M13. It had no monitor at all, so an outage there would
-  // have looked like "the agents have gone quiet" with no way to tell why.
-  //
-  // Reachable because Kuma is on `apps` and these expose HTTP there. openclaw
-  // and hermes are deliberately NOT here: they sit on `agent` only, and
-  // widening Kuma into that segment is exactly what the cliproxy push monitor
-  // above exists to avoid. Their health is visible through the runs they
-  // produce, on the dashboard.
-  // omniroute is a PUSH monitor for the same reason cliproxy is: it lives on
-  // `agent`, Kuma lives on `apps`, and Kuma cannot resolve names there.
-  //
-  // This was first added as an HTTP monitor and reported a permanent outage
-  // for a healthy service — getaddrinfo ENOTFOUND, which reads like a crash
-  // and is really a network boundary. The reasoning was already written down
-  // three paragraphs above, for cliproxy, and got missed anyway.
-  //
-  // The heartbeat sidecar reports it: its hourly check already goes THROUGH
-  // omniroute to reach cliproxy, so a successful completion proves both.
-  { name: "omniroute", type: "push", interval: 3900 },
   { name: "portfolio", url: "http://" + process.env.PREFIX + "portfolio:8080/healthz" },
-  { name: "dashboard", url: "http://" + process.env.PREFIX + "dashboard:8090/healthz" },
   // postgres and redis are NOT here on purpose. They sit on `data`
   // (internal: true) and Kuma sits on `apps`, so it cannot reach them at all
   // — a monitor would report a permanent outage for two healthy databases.

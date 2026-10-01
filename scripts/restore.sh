@@ -142,19 +142,19 @@ if [[ "$MODE" == rehearse ]]; then
 	# or unparseable the "restore" would be a no-op that looked like success —
 	# the precise illusion this rehearsal exists to break.
 	roles_found=$(pg psql -U "${POSTGRES_SUPER_USER}" -d postgres -tAc \
-		"SELECT count(*) FROM pg_roles WHERE rolname IN ('n8n','paperclip','hermes')" \
+		"SELECT count(*) FROM pg_roles WHERE rolname IN ('n8n')" \
 		| tr -d '[:space:]')
 
-	if [[ "$roles_found" != "3" ]]; then
+	if [[ "$roles_found" != "1" ]]; then
 		log "replay log tail:"
 		tail -20 "${SCRATCH}/replay.log" >&2
-		die "expected the 3 service roles to exist, found ${roles_found}"
+		die "expected the 1 service role to exist, found ${roles_found}"
 	fi
-	log "  roles present after replay: ${roles_found}/3"
+	log "  roles present after replay: ${roles_found}/1"
 
 	# Confirm the dump text carries each service's database, which is what a
 	# real recovery rebuilds from.
-	for svc in n8n paperclip hermes; do
+	for svc in n8n; do
 		grep -q "CREATE DATABASE ${svc}" "$LOCAL_DUMP" \
 			|| die "dump does not contain CREATE DATABASE for ${svc}"
 		log "  dump contains database: ${svc}"

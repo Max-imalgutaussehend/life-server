@@ -49,14 +49,6 @@ ingress:
   - hostname: "n8n${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80
 
-  # paperclip — Paperclip — the agent board (upstream, M11) [access: private]
-  - hostname: "paperclip${ENV_PREFIX}.${DOMAIN}"
-    service: http://${ENV_PREFIX_NAME}caddy:80
-
-  # openclaw — OpenClaw Control — the agent's own web chat (M14) [access: private]
-  - hostname: "openclaw${ENV_PREFIX}.${DOMAIN}"
-    service: http://${ENV_PREFIX_NAME}caddy:80
-
   # earnings-alpha — Earnings-call sentiment portfolio piece — static nginx build [access: public]
   - hostname: "earnings-alpha${ENV_PREFIX}.${DOMAIN}"
     service: http://${ENV_PREFIX_NAME}caddy:80

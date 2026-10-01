@@ -168,49 +168,6 @@ verify-data: ## [M4] Prove per-service DB isolation and Redis auth on the server
 	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
 		'bash /opt/life-server/scripts/verify-data-layer.sh'
 
-# The M9 `paperclip*` targets are gone (M11). They drove the hand-written Go UI
-# from this machine over SSH+psql, which ADR-0017 required while Claude Code's
-# credential was believed to be Keychain-bound. Upstream Paperclip owns the
-# board now and the agents run on the server, so the loop is a container rather
-# than a Makefile target: see `make logs` and the board at paperclip.${DOMAIN}.
-
-# The proxy holds the Claude OAuth credential, and minting it needs a browser —
-# the one thing a headless VPS cannot do. This runs the interactive login
-# against the container so the credential lands in the volume that persists it.
-#
-# EXPECT TO RUN THIS ROUGHLY WEEKLY: the credential expires in ~7 days
-# (ADR-0020). Uptime Kuma alerts before it does; this is the fix.
-.PHONY: proxy-login
-proxy-login: ## [M11] Authenticate the subscription proxy (needed ~weekly)
-	@echo "$(BOLD)==> Claude OAuth login for the proxy$(OFF)"
-	@echo "    1. Open the URL this prints and approve it."
-	@echo "    2. You land on a localhost:54545 page that FAILS TO LOAD."
-	@echo "       That is expected — the callback server is on the VPS, not on"
-	@echo "       your device, so nothing local is listening on that port."
-	@echo "    3. Copy that failed page's FULL URL from the address bar and"
-	@echo "       paste it back here. The auth code is in the URL, not the page."
-	@echo ""
-	@ssh -t -i $(SSH_KEY) deploy@$(SERVER_IP) \
-		'docker exec -it $(ENV_PREFIX_NAME)cliproxy \
-			/CLIProxyAPI/CLIProxyAPI -claude-login -no-browser -config /data/config.yaml'
-
-.PHONY: verify-agent-sandbox
-verify-agent-sandbox: ## [M9] Prove agent sessions cannot reach the data layer
-	@./scripts/deploy.sh --sync-only >/dev/null
-	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
-		'ENV_PREFIX_NAME=$(ENV_PREFIX_NAME) bash /opt/life-server/scripts/verify-agent-sandbox.sh'
-
-.PHONY: verify-subscription-load
-verify-subscription-load: ## Check agent load is off the Pro subscription (local, no SSH)
-	@./scripts/verify-subscription-load.sh
-
-.PHONY: migrate
-migrate: ## [M9] Apply SQL migrations (DB=paperclip, MODE=--status|--dry-run)
-	@test -n "$(DB)" || { echo "$(ERR)DB= is required, e.g. make migrate DB=paperclip$(OFF)"; exit 1; }
-	@./scripts/deploy.sh --sync-only >/dev/null
-	@ssh -i $(SSH_KEY) -o BatchMode=yes deploy@$(SERVER_IP) \
-		'bash /opt/life-server/scripts/migrate.sh $(DB) $(MODE)'
-
 .PHONY: psql
 psql: ## [M4] Open a psql shell (DB=n8n for a service database)
 	@ssh -i $(SSH_KEY) -t deploy@$(SERVER_IP) \

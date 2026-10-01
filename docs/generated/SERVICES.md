@@ -15,8 +15,6 @@ add or change a service there and run `make generate`.
 | Service | Hostname (prod) | Hostname (dev) | Port | Access | Networks | Health |
 |---|---|---|---|---|---|---|
 | `n8n` | `n8n.$DOMAIN` | `n8n.dev.$DOMAIN` | 5678 | private | apps, data | `/healthz` |
-| `paperclip` | `paperclip.$DOMAIN` | `paperclip.dev.$DOMAIN` | 3100 | private | apps, data | `/` |
-| `openclaw` | `openclaw.$DOMAIN` | `openclaw.dev.$DOMAIN` | 18789 | private | agent | `/` |
 | `earnings-alpha` | `earnings-alpha.$DOMAIN` | `earnings-alpha.dev.$DOMAIN` | 8083 | public | apps | `/` |
 | `regime-lens` | `regime-lens.$DOMAIN` | `regime-lens.dev.$DOMAIN` | 8084 | public | apps | `/` |
 | `portfolio` | `portfolio.$DOMAIN` | `portfolio.dev.$DOMAIN` | 8080 | public | apps | `/` |

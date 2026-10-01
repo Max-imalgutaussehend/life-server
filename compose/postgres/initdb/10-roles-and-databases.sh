@@ -41,7 +41,7 @@ CONN_LIMIT=20
 SUPER="${POSTGRES_USER:-${POSTGRES_SUPER_USER:-postgres}}"
 
 # Services needing a database. Space-separated, set by the compose file.
-SERVICES="${POSTGRES_SERVICES:-n8n paperclip hermes}"
+SERVICES="${POSTGRES_SERVICES:-n8n}"
 
 skipped=0
 

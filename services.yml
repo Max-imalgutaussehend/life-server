@@ -79,12 +79,6 @@ services:
   # uni and job search. Reverted within minutes. Verify gating by the redirect
   # TARGET (cloudflareaccess.com), never by the status code: Uptime Kuma proved
   # in M8 that a 302 can equally mean "the app redirected you itself".
-  - name: paperclip
-    port: 3100
-    description: "Paperclip — the agent board (upstream, M11)"
-    networks: [apps, data]
-    access: private
-    enabled: true # M9
 
   # Hermes is an AGENT RUNTIME, not a web app. Paperclip calls it over HTTP/SSE
   # on the internal `agent` network; nothing outside the host ever needs to
@@ -112,12 +106,6 @@ services:
   #
   # It stays on `agent` only: no Postgres, no Redis, no n8n (ADR-0004). Caddy
   # reaches it across networks the same way it reaches every other app.
-  - name: openclaw
-    port: 18789
-    description: "OpenClaw Control — the agent's own web chat (M14)"
-    networks: [agent]
-    access: private
-    enabled: true # M14
 
   # ── earnings-alpha — portfolio piece, static nginx build ──────────────────
   # Same shape as the (removed) `options` entry: a static build, no backend, no
