@@ -1,0 +1,192 @@
+> **Branch `r2` — Aevia.** This branch is the in-progress rewrite of life-server
+> as a Kubernetes platform (OpenTofu, k3s, Cilium, Argo CD). The agent stack has
+> been removed here. The Docker/Ansible implementation lives on at tag
+> `release-1`. See [ADR-0028](docs/adr/0028-aevia-r2-kubernetes-platform.md) and
+> [the migration plan](docs/migration/R2-PLAN.md). The text below still
+> describes R1 and is rewritten in phase 02.
+
+# life-server
+
+Personal AI infrastructure on a single Hetzner VPS. Ubuntu 24.04, everything in
+Docker, everything reproducible from this repository.
+
+> **Status:** M0–M5, M7, M8 complete; M11 deployed. The stack is live:
+> Cloudflare Tunnel → Caddy → n8n and Paperclip, on PostgreSQL and Redis, with
+> restic backups (restore rehearsed, off-host copy verified), Uptime Kuma + ntfy
+> alerting proven by a real outage, and secrets encrypted in Git with CI
+> enforcing the repository's invariants.
+>
+> The agent system runs: Paperclip as the board, Hermes as the CEO, OpenClaw as
+> the WhatsApp assistant, all on one Claude subscription behind a proxy. The
+> sandbox keeping them away from the data layer is tested rather than asserted —
+> `make verify-agent-sandbox`, currently 20/20. See
+> [`docs/milestones/`](docs/milestones/) for each milestone.
+>
+> Every private hostname sits behind Cloudflare Access as of 2026-07-31. The one
+> deliberate exception is the ntfy topic path, which the phone app needs and
+> which ntfy's own `deny-all` still protects. Remaining work is in
+> **[`docs/OPERATOR-TASKS.md`](docs/OPERATOR-TASKS.md)**.
+
+## Quick start
+
+```bash
+make setup     # install local tooling, create .env, generate config
+make check     # verify generated files are current
+make ping      # confirm the server is reachable
+make help      # everything else
+```
+
+## What this is
+
+A long-lived host for personal automation and AI agents: n8n, Paperclip,
+Hermes, MCP servers, PostgreSQL, Redis. Built to be extended for years rather
+than rebuilt.
+
+The design priorities, in order: **security, maintainability, simplicity,
+automation, reproducibility.**
+
+## Architecture
+
+```mermaid
+graph TB
+    Client([Internet])
+    CF[Cloudflare<br/>TLS · WAF · Access]
+    Client -->|HTTPS| CF
+
+    subgraph VPS["Hetzner VPS — Ubuntu 24.04"]
+        direction TB
+        UFW["UFW: only 22/tcp inbound<br/>closes entirely at M8.5"]
+
+        subgraph Docker["Docker"]
+            direction TB
+
+            subgraph EdgeNet["network: edge"]
+                CFD[cloudflared]
+                CADDY[caddy]
+            end
+
+            subgraph AppsNet["network: apps"]
+                N8N[n8n]
+                PC[paperclip]
+                KUMA[uptime kuma]
+            end
+
+            subgraph AgentNet["network: agent — runs model-chosen code"]
+                HER[hermes<br/>CEO]
+                OC[openclaw<br/>WhatsApp]
+                PROXY[cliproxy<br/>holds the subscription]
+            end
+
+            subgraph DataNet["network: data — internal, no egress"]
+                PG[(postgres)]
+                RD[(redis)]
+            end
+
+            CFD --> CADDY
+            CADDY --> N8N
+            CADDY --> PC
+            N8N --> PG
+            PC --> PG
+            N8N --> RD
+            HER --> PROXY
+            OC --> PROXY
+            HER --> PC
+            OC --> PC
+        end
+    end
+
+    CF -.->|outbound tunnel<br/>no inbound port| CFD
+    Docker -->|encrypted| BK[(offsite backups<br/>restic)]
+
+    style DataNet fill:#2d3748,stroke:#e53e3e,color:#fff
+    style AgentNet fill:#2d3748,stroke:#d69e2e,color:#fff
+    style UFW fill:#742a2a,color:#fff
+    style CF fill:#2c5282,color:#fff
+```
+
+The server accepts **one** inbound connection type: SSH on port 22, rate
+limited. Web traffic arrives through an outbound-initiated Cloudflare tunnel,
+so ports 80 and 443 are never open. Databases sit on an internal network with
+no route to the internet and are reachable only by containers explicitly placed
+there.
+
+**The agent network is the newest boundary and the most important one.** Hermes
+and OpenClaw execute code a language model chose, so they get their own segment
+with no route to Postgres, Redis, n8n or Uptime Kuma. They reach the board
+through Paperclip's API — an interface, never a connection string — and reach
+models through a proxy that demands a key. `make verify-agent-sandbox` starts a
+container on that network and attempts everything an escaped agent would; all 20
+assertions must fail to connect. See
+[ADR-0020](docs/adr/0020-upstream-paperclip-and-subscription-proxy.md).
+
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| [`services.yml`](services.yml) | **Single source of truth.** Every externally reachable service is declared here and nowhere else. |
+| [`generator/`](generator/) | Renders Caddy, tunnel, env and docs config from `services.yml`. |
+| [`ansible/`](ansible/) | Host baseline only — users, SSH, firewall, Docker. |
+| [`compose/`](compose/) | Docker Compose stacks. `compose/generated/` is machine-written. |
+| [`docs/adr/`](docs/adr/) | Architecture Decision Records — why things are the way they are. |
+| [`docs/milestones/`](docs/milestones/) | What each milestone changed, how to verify, how to undo. |
+| [`scripts/`](scripts/) | Operational scripts. |
+| [`env.example`](env.example) | Committed contract for `.env`. `.env` itself is never in Git. |
+
+## Adding a service
+
+One file:
+
+```yaml
+# services.yml
+- name: myservice
+  port: 3000
+  description: "What it does"
+  networks: [apps, data]
+  access: private
+```
+
+Then `make generate`. Caddy routes, tunnel ingress, environment variables and
+documentation all update. Committing stale generated output fails pre-commit.
+See [ADR-0014](docs/adr/0014-service-registry.md).
+
+## Key decisions
+
+Full reasoning in [`docs/adr/`](docs/adr/). The ones that shape everything else:
+
+| | Decision |
+|---|---|
+| [0001](docs/adr/0001-ansible-for-host-baseline.md) | Ansible for the host, Compose for applications — strict boundary |
+| [0003](docs/adr/0003-cloudflare-tunnel-terminates-tls.md) | Cloudflare terminates TLS; Caddy never binds a host port |
+| [0004](docs/adr/0004-segmented-docker-networks.md) | Three networks; databases unreachable unless explicitly joined |
+| [0005](docs/adr/0005-postgres-db-and-role-per-service.md) | One Postgres, one database and role per service |
+| [0006](docs/adr/0006-env-then-sops.md) | Plain `.env` now, SOPS from M7 |
+| [0009](docs/adr/0009-backups-before-stateful-services.md) | Backups ship before the first stateful service |
+| [0011](docs/adr/0011-pinned-image-versions.md) | Pinned image versions, never `latest` |
+| [0014](docs/adr/0014-service-registry.md) | `services.yml` is the single source of truth |
+| [0020](docs/adr/0020-upstream-paperclip-and-subscription-proxy.md) | Upstream Paperclip; Hermes + OpenClaw on one subscription proxy (supersedes 0017/0018/0019) |
+
+## Roadmap
+
+| | Milestone | Delivers |
+|---|---|---|
+| M0 | Repository | ✅ ADRs, generator, tooling |
+| M1 | Host baseline | ✅ `deploy` user, SSH hardening, UFW, fail2ban |
+| M2 | Docker platform | ✅ Docker, segmented networks, filesystem layout |
+| M3 | Ingress | ✅ Cloudflare Tunnel + Caddy |
+| M4 | Data | ✅ PostgreSQL, Redis, per-service roles |
+| M5 | Backups | ✅ restic, rehearsed restore, off-host copy on the laptop |
+| M6 | n8n | 🔶 running, owner claimed — needs an Access policy ([M6](docs/milestones/M6.md)) |
+| M7 | Deployment | ✅ SOPS, CI with its own age key, `validate` workflow green on every push |
+| M8 | Monitoring | ✅ Uptime Kuma + ntfy — outage → alert verified ([M8](docs/milestones/M8.md)) |
+| M8.5 | Remote access | 🔶 designed — [ADR-0016](docs/adr/0016-ssh-via-cloudflare-access.md) replaces Tailscale with Access SSH. Port 22 still open pending operator verification ([M8.5](docs/milestones/M8.5.md)) |
+| M9 | Applications | ✅ agent loop + web UI ([M9](docs/milestones/M9.md)) — both replaced in M11 |
+| M10 | Agents on the server | ✅ superseded by M11 — `claude setup-token` proved ADR-0017 wrong |
+| M11 | Paperclip + agents | 🔶 deployed, sandbox 20/20 — awaiting the proxy login ([M11](docs/milestones/M11.md)) |
+
+## Requirements
+
+- macOS or Linux workstation
+- `python3` with `pyyaml` and `jinja2`
+- `ansible` (`brew install ansible`)
+- `pre-commit` (`brew install pre-commit`)
+- SSH key at `~/.ssh/life-server`
