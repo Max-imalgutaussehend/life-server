@@ -7,7 +7,7 @@ Each phase needs: ADR, test, rollback. Status: `todo` unless noted.
 |---|---|---|
 | 01 | R1 audit + freeze (tag `release-1` pushed; CI green; restore rehearsal) | no |
 | 02 | Aevia rebrand (docs/text first; GitHub repo rename last) | no |
-| 03 | Service inventory → `catalog/services.yml` | no |
+| 03 | Service inventory → `catalog/services.yml` (drafted) | no |
 | 04 | Remove agent stack (Paperclip, Hermes, OpenClaw, CLIProxy) | no |
 | 05 | R2 repo design + OpenTofu modules | no |
 | 06 | Provision parallel R2 VPS | Hetzner, tofu state |

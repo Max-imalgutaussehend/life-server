@@ -1,0 +1,84 @@
+# Aevia service catalog (R2) — successor of ../services.yml.
+# Derived from R1 at release-1 (phase 03). R1 file stays authoritative until cutover.
+#
+# Differences from R1:
+#   - paperclip, openclaw dropped (agent stack removed, phase 04)
+#   - networks: replaced by namespace + explicit `needs` (Cilium allow-list)
+#   - new deployment fields: type, exposure, replicas, resources, persistence, auth
+#
+# FIELD REFERENCE
+#   type        application | platform
+#   exposure    public (reachable by anyone) | private (behind Authentik/Access)
+#   port        container port; never published on the node
+#   needs       dependencies this service may reach; everything else is denied
+#   persistence PVC size, or none
+#   TODO values are placeholders to be sized in the phase that migrates the service.
+
+defaults:
+  replicas: 1
+  resources: { cpu: 100m, memory: 128Mi }
+  auth: none
+
+services:
+  - name: n8n
+    type: application
+    description: "Workflow automation and integration engine"
+    port: 5678
+    exposure: private
+    auth: authentik
+    healthcheck: /healthz
+    needs: [postgres, redis]
+    persistence: 5Gi # TODO size
+    resources: { cpu: 250m, memory: 512Mi }
+
+  - name: earnings-alpha
+    type: application
+    description: "Earnings-call sentiment portfolio piece — static nginx build"
+    port: 8083
+    exposure: public
+    needs: []
+    persistence: none
+
+  - name: regime-lens
+    type: application
+    description: "Market-regime detection portfolio piece — static nginx build"
+    port: 8084
+    exposure: public
+    needs: []
+    persistence: none
+
+  - name: portfolio
+    type: application
+    description: "Static personal site on the bare domain"
+    port: 8080
+    exposure: public
+    apex: true
+    needs: []
+    persistence: none
+
+  - name: longevity
+    type: application
+    description: "LONGEVITY — Health Score Platform (DHBW MVP)"
+    port: 8082
+    api_port: 3000
+    exposure: public
+    healthcheck: /api/healthz
+    needs: [postgres]
+    persistence: none
+
+  - name: status
+    type: platform
+    description: "Uptime Kuma — service monitoring and alerting"
+    port: 3001
+    exposure: private
+    auth: authentik
+    needs: [ntfy]
+    persistence: 1Gi # TODO size
+
+  - name: ntfy
+    type: platform
+    description: "Push notification relay for alerts"
+    port: 80
+    exposure: private # the R2 sketch said public; R1 is private — decide in phase 19
+    needs: []
+    persistence: 1Gi # TODO size
