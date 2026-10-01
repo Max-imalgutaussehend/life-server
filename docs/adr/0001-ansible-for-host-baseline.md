@@ -1,6 +1,6 @@
 # ADR-0001: Ansible for the host baseline, Compose for everything above it
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch; remains in force on R1 (`release-1`) until cutover
 - **Date:** 2026-07-28
 - **Milestone:** M0
 

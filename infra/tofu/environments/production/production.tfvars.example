@@ -1,0 +1,8 @@
+# Copy to production.tfvars (gitignored). Secrets: pass via SOPS or TF_VAR_*, not here.
+domain                = "example.com"
+cloudflare_account_id = ""
+cloudflare_zone_id    = ""
+ssh_public_key        = "ssh-ed25519 AAAA... life-server"   # ~/.ssh/life-server.pub
+ssh_allowed_cidrs     = []                                    # ["<your-ip>/32"]
+object_storage_endpoint = "https://fsn1.your-objectstorage.com"
+# hcloud_token, cloudflare_api_token, tunnel_secret, object_storage_*_key -> TF_VAR_*

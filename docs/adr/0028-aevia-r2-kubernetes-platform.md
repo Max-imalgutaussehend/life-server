@@ -1,9 +1,9 @@
 # ADR-0028: Aevia R2 — transform life-server into a Kubernetes platform
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-01)
 - **Date:** 2026-10-01
 - **Milestone:** R2-P0
-- **Supersedes (on acceptance):** ADR-0001, 0002, 0003, 0004, 0007, 0019, 0020, 0021, 0023
+- **Supersedes:** ADR-0001, 0002, 0003, 0004, 0007, 0019, 0020, 0021, 0023
 
 ## Context
 

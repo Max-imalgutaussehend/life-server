@@ -1,6 +1,6 @@
 # ADR-0003: Cloudflare Tunnel terminates TLS; Caddy never binds a host port
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0028](0028-aevia-r2-kubernetes-platform.md) on the `r2` branch; remains in force on R1 (`release-1`) until cutover
 - **Date:** 2026-07-28
 - **Milestone:** M0 (decision), M3 (implementation)
 

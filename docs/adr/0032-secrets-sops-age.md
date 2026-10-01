@@ -10,7 +10,7 @@ R1 uses `.env` then SOPS (ADR-0006). Kubernetes needs the same without plaintext
 
 ## Decision
 
-SOPS-encrypted manifests, age recipient in `.sops.yaml`, decrypted in-cluster by the Argo CD ksops plugin. The private key exists in two places outside git (operator machine, offline backup).
+SOPS-encrypted manifests, age recipient in `.sops.yaml`, decrypted in-cluster by the Argo CD ksops plugin. Recipients are the existing operator and CI keys from `.sops.yaml` (ADR-0006); no new operator key is generated. The in-cluster decryption key is a third, separate recipient added in phase 10. Private keys exist only outside git (operator machine, offline backup).
 
 ## Verification
 
