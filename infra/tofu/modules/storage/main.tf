@@ -10,7 +10,7 @@ terraform {
 variable "buckets" {
   description = "S3-compatible buckets (Hetzner Object Storage). Provider endpoint is configured by the caller."
   type        = set(string)
-  default     = ["aevia-backups", "aevia-artifacts", "aevia-tofu-state"]
+  default     = ["aevia-backups", "aevia-artifacts"] # state bucket is created by hand (runbook)
 }
 
 resource "aws_s3_bucket" "this" {

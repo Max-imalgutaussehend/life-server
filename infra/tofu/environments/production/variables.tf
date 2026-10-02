@@ -56,7 +56,7 @@ variable "nodes" {
     volume_gb   = optional(number, 0)
   }))
   default = {
-    "01" = { role = "control", server_type = "cx32", volume_gb = 0 }
-    # "01" = { role = "agent", server_type = "cx32" }  # phase 23
+    "01" = { role = "control", server_type = "cx33", volume_gb = 0 }
+    # "01" = { role = "agent", server_type = "cx33" }  # phase 23
   }
 }
