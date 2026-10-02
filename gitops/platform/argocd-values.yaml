@@ -1,0 +1,14 @@
+# Argo CD (ADR-0031). Installed once by hand/tofu; afterwards it manages itself via gitops/apps.
+global:
+  domain: argocd.example.com   # replaced in phase 11 (Cloudflare)
+configs:
+  params:
+    server.insecure: true      # TLS terminates at Cloudflare; the Service is ClusterIP only
+  cm:
+    exec.enabled: "false"
+    users.anonymous.enabled: "false"
+server:
+  service:
+    type: ClusterIP
+dex:
+  enabled: false
