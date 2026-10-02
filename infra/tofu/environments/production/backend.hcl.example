@@ -1,4 +1,3 @@
-bucket   = "aevia-tofu-state"
-endpoint = "https://hel1.your-objectstorage.com"
-access_key = "__SET__"
-secret_key = "__SET__"
+bucket = "aevia-tofu-state"
+endpoints = { s3 = "https://hel1.your-objectstorage.com" }
+# credentials: export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (never in this file)
